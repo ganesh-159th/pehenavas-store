@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pehenavas - The Royal Heritage</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: #faf6f0; }
+      #root { min-height: 100vh; }
+      #app-loader {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        background: #faf6f0;
+        color: #783d4f;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.5rem;
+        letter-spacing: 0.1em;
+        transition: opacity 0.3s ease;
+      }
+      #app-loader.fade-out { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app-loader">PEHENAVAS</div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
