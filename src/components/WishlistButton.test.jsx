@@ -408,7 +408,7 @@ describe('WishlistButton Component', () => {
     });
 
     it('correctly handles when wishlist changes after initial render', () => {
-      const { rerender } = render(<WishlistButton product={mockProduct} />);
+      render(<WishlistButton product={mockProduct} />);
       
       // Initially not wishlisted
       useStoreModule.useStore.mockReturnValue({
@@ -487,7 +487,7 @@ describe('WishlistButton Component', () => {
         toggleWishlist: mockToggleWishlist
       });
 
-      const { container } = render(<WishlistButton product={mockProduct} />);
+      render(<WishlistButton product={mockProduct} />);
       const button = screen.getByRole('button');
       expect(button).toBeInTheDocument();
     });
@@ -500,7 +500,7 @@ describe('WishlistButton Component', () => {
         toggleWishlist: mockToggleWishlist
       });
 
-      const { rerender } = render(<WishlistButton product={mockProduct} />);
+      render(<WishlistButton product={mockProduct} />);
       
       let { container } = render(<WishlistButton product={mockProduct} />);
       let heart = container.querySelector('svg');
@@ -542,7 +542,7 @@ describe('WishlistButton Component', () => {
         toggleWishlist: mockToggleWishlist
       });
 
-      const { rerender } = render(<WishlistButton product={product1} />);
+      render(<WishlistButton product={product1} />);
       
       let { container } = render(<WishlistButton product={product1} />);
       let heart = container.querySelector('svg');

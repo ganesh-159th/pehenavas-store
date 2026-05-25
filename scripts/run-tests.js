@@ -1,6 +1,6 @@
 
 import { spawnSync } from 'child_process';
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -96,4 +96,5 @@ const result = spawnSync('npx', ['vitest', '--run', '--reporter=verbose'], {
 });
 
 printSummary(result.status, startTime);
+// eslint-disable-next-line no-undef
 process.exit(result.status ?? 1);

@@ -13,7 +13,8 @@ export default function AdminLogin() {
   const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => setIsMounted(true), 50);
+    return () => clearTimeout(timer);
   }, []);
   
   const { adminLogin } = useStore();

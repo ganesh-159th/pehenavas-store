@@ -58,7 +58,7 @@ export default function App() {
                 product.category.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
-    }, [searchQuery]);
+    }, [searchQuery, products]);
 
     useEffect(() => {
         const handleScroll = () => {
