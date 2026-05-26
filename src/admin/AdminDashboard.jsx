@@ -168,20 +168,23 @@ export default function AdminDashboard() {
             { key: 'products', label: 'Products', icon: Package },
             { key: 'orders', label: 'Orders', icon: ShoppingCart },
             { key: 'customers', label: 'Customers', icon: Users },
-          ].map(({ key, label, icon: Icon }) => (
+          ].map((item) => {
+            const IconComp = item.icon;
+            return (
             <button
-              key={key}
-              onClick={() => setActiveSection(key)}
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
               className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-colors font-medium border-l-4 text-left ${
-                activeSection === key
+                activeSection === item.key
                   ? 'bg-rose-900 text-white font-bold border-amber-400 shadow-inner'
                   : 'text-rose-200 hover:bg-rose-900 hover:text-white border-transparent hover:border-amber-400/50'
               }`}
             >
-              <Icon className={`w-5 h-5 ${activeSection === key ? 'text-amber-400' : ''}`} />
-              <span>{label}</span>
+              <IconComp className={`w-5 h-5 ${activeSection === item.key ? 'text-amber-400' : ''}`} />
+              <span>{item.label}</span>
             </button>
-          ))}
+            );
+          })}
         </nav>
         <div className="p-4 border-t border-rose-800">
           <button onClick={handleLogout} className="flex items-center space-x-3 px-3 py-3 w-full text-red-400 hover:bg-rose-900 hover:text-red-300 rounded-lg transition-colors font-bold">
