@@ -140,28 +140,28 @@ const Home = ({ searchResults, searchQuery }) => {
                         </div>
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                             <div className="flex items-center gap-2">
-                                <Filter className="w-4 h-4 text-gray-500" />
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Price:</span>
+                                <Filter className="w-4 h-4 text-rose-950" />
+                                <span className="text-xs font-bold text-rose-950 uppercase tracking-wider">Price:</span>
                                 <input
                                     type="number" min="0" placeholder="Min"
                                     value={minPrice}
                                     onChange={(e) => dispatch({ type: 'SET_MIN_PRICE', payload: e.target.value })}
-                                    className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none"
+                                    className="w-20 px-2 py-1.5 border border-rose-100/80 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none bg-white/60 backdrop-blur-sm transition-all duration-200 hover:border-rose-300"
                                 />
-                                <span className="text-gray-400">-</span>
+                                <span className="text-rose-300">-</span>
                                 <input
                                     type="number" min="0" placeholder="Max"
                                     value={maxPrice}
                                     onChange={(e) => dispatch({ type: 'SET_MAX_PRICE', payload: e.target.value })}
-                                    className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none"
+                                    className="w-20 px-2 py-1.5 border border-rose-100/80 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none bg-white/60 backdrop-blur-sm transition-all duration-200 hover:border-rose-300"
                                 />
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sort:</span>
+                                <span className="text-xs font-bold text-rose-950 uppercase tracking-wider">Sort:</span>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => dispatch({ type: 'SET_SORT_BY', payload: e.target.value })}
-                                    className="px-3 py-1.5 border border-gray-200 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none bg-white"
+                                    className="px-3 py-1.5 border border-rose-100/80 rounded-md text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none bg-white/60 backdrop-blur-sm transition-all duration-200 hover:border-rose-300"
                                 >
                                     <option value="default">Default</option>
                                     <option value="price-asc">Price: Low to High</option>

@@ -110,7 +110,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-[#faf6f0] font-sans text-gray-900">
-            <header className="bg-rose-950 text-white sticky top-0 z-40 border-b-4 border-amber-500 shadow-md">
+            <header className={`bg-rose-950 text-white border-b-4 border-amber-500 shadow-md ${isAdminPage ? '' : 'sticky top-0 z-40'}`}>
                 <div className="bg-amber-500 text-rose-950 text-xs md:text-sm font-bold text-center py-1.5 px-4 tracking-wide">
                     Sandbox Testing Environment - <Link to="/terms" className="underline hover:text-rose-800">No Real Transactions</Link>
                 </div>

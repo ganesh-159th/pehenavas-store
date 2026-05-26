@@ -11,6 +11,14 @@ const mockOrders = [
   {id: '#ORD-7349', name: 'Karan Singh', item: 'Embroidered Lehenga', status: 'Returned', color: 'bg-red-100 text-red-800 border-red-200', amount: '₹14,999'}
 ];
 
+const mockCustomers = [
+  {name: 'Priya Sharma', email: 'priya.sharma@email.com', orders: 12, spent: '₹1,24,999', status: 'Gold', color: 'bg-amber-100 text-amber-800 border-amber-200'},
+  {name: 'Rahul Verma', email: 'rahul.verma@email.com', orders: 8, spent: '₹82,499', status: 'Silver', color: 'bg-gray-100 text-gray-800 border-gray-200'},
+  {name: 'Anjali Gupta', email: 'anjali.gupta@email.com', orders: 15, spent: '₹2,12,499', status: 'Platinum', color: 'bg-purple-100 text-purple-800 border-purple-200'},
+  {name: 'Karan Singh', email: 'karan.singh@email.com', orders: 5, spent: '₹45,999', status: 'Bronze', color: 'bg-orange-100 text-orange-800 border-orange-200'},
+  {name: 'Neha Patel', email: 'neha.patel@email.com', orders: 20, spent: '₹3,45,999', status: 'Platinum', color: 'bg-purple-100 text-purple-800 border-purple-200'},
+];
+
 export default function AdminDashboard() {
   const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct } = useStore();
   const navigate = useNavigate();
@@ -23,6 +31,7 @@ export default function AdminDashboard() {
   });
   const [imagePreview, setImagePreview] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSection, setActiveSection] = useState('overview');
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -147,29 +156,32 @@ export default function AdminDashboard() {
       )}
 
       {/* Sidebar */}
-      <aside className="w-64 bg-rose-950 border-r border-rose-900 flex flex-col hidden md:flex fixed h-full shadow-2xl z-10">
+      <aside className="w-64 bg-rose-950 border-r border-rose-900 flex flex-col hidden md:flex shadow-2xl z-10 rounded-r-2xl">
         <div className="h-16 flex items-center justify-center px-6 border-b border-rose-800">
           <h1 className="text-2xl font-bold tracking-widest font-serif text-white uppercase leading-none mt-2">
             PEHENAVAS<span className="text-amber-400 font-sans text-xs tracking-normal ml-1 align-top opacity-90 block text-center mt-1">Admin</span>
           </h1>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          <a href="#" className="flex items-center space-x-3 px-3 py-3 bg-rose-900 text-white rounded-lg font-bold border-l-4 border-amber-400 shadow-inner">
-            <LayoutDashboard className="w-5 h-5 text-amber-400" />
-            <span>Overview</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 px-3 py-3 text-rose-200 hover:bg-rose-900 hover:text-white rounded-lg transition-colors font-medium border-l-4 border-transparent hover:border-amber-400/50">
-            <Package className="w-5 h-5" />
-            <span>Products</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 px-3 py-3 text-rose-200 hover:bg-rose-900 hover:text-white rounded-lg transition-colors font-medium border-l-4 border-transparent hover:border-amber-400/50">
-            <ShoppingCart className="w-5 h-5" />
-            <span>Orders</span>
-          </a>
-          <a href="#" className="flex items-center space-x-3 px-3 py-3 text-rose-200 hover:bg-rose-900 hover:text-white rounded-lg transition-colors font-medium border-l-4 border-transparent hover:border-amber-400/50">
-            <Users className="w-5 h-5" />
-            <span>Customers</span>
-          </a>
+          {[
+            { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+            { key: 'products', label: 'Products', icon: Package },
+            { key: 'orders', label: 'Orders', icon: ShoppingCart },
+            { key: 'customers', label: 'Customers', icon: Users },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-colors font-medium border-l-4 text-left ${
+                activeSection === key
+                  ? 'bg-rose-900 text-white font-bold border-amber-400 shadow-inner'
+                  : 'text-rose-200 hover:bg-rose-900 hover:text-white border-transparent hover:border-amber-400/50'
+              }`}
+            >
+              <Icon className={`w-5 h-5 ${activeSection === key ? 'text-amber-400' : ''}`} />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
         <div className="p-4 border-t border-rose-800">
           <button onClick={handleLogout} className="flex items-center space-x-3 px-3 py-3 w-full text-red-400 hover:bg-rose-900 hover:text-red-300 rounded-lg transition-colors font-bold">
@@ -180,9 +192,9 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-8">
+      <main className="flex-1 p-8">
         <header className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-rose-950 font-serif">Dashboard Overview</h2>
+          <h2 className="text-3xl font-bold text-rose-950 font-serif capitalize">{activeSection}</h2>
           <div className="flex space-x-4">
             <button 
               onClick={() => setIsSearchOpen(true)} 
@@ -306,170 +318,289 @@ export default function AdminDashboard() {
 
         {/* Original inline search bar for reference (can be removed) */}
 
-        {/* Row 1: Analytics & Best Sellers Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Revenue Analytics (2/3) */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden">
-            <div className="flex justify-between items-start mb-2">
+        {activeSection === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="text-xl font-bold text-rose-950 font-serif">Revenue Analytics</h3>
+                  <p className="text-sm font-medium text-rose-900/60 mt-1">Daily fashion drops & seasonal performance</p>
+                </div>
+                <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-100">
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">+24.5%</span>
+                </div>
+              </div>
+              <div className="h-48 mt-6 flex items-end justify-between space-x-2">
+                {[30, 45, 35, 60, 50, 75, 65, 85, 70, 95, 80, 100].map((val, idx) => (
+                  <div key={idx} className="w-full bg-rose-50 rounded-t-md relative group h-full flex items-end">
+                    <div className="w-full bg-amber-400 rounded-t-md group-hover:bg-amber-500 transition-all duration-300 relative" style={{ height: `${val}%` }}>
+                      <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-rose-950 text-white text-xs font-bold py-1.5 px-2.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-lg">
+                        ₹{(val * 1234).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-rose-900/50 mt-3 font-bold uppercase tracking-widest px-1">
+                <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-rose-100 shadow-sm relative flex flex-col h-full">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-rose-950 font-serif">Best-Sellers</h3>
+                <Star className="w-5 h-5 text-amber-500 fill-amber-500 drop-shadow-sm" />
+              </div>
+              <div className="space-y-4 flex-1">
+                {[
+                  {name: 'Royal Silk Sherwani', sold: 342, rating: 4.9, img: 'https://via.placeholder.com/150'},
+                  {name: 'Embroidered Lehenga', sold: 289, rating: 4.8, img: 'https://via.placeholder.com/150'},
+                  {name: 'Classic White Kurta', sold: 195, rating: 4.6, img: 'https://via.placeholder.com/150'},
+                  {name: 'Velvet Bandhgala', sold: 154, rating: 4.7, img: 'https://via.placeholder.com/150'}
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center space-x-4 p-2.5 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 cursor-pointer group">
+                    <img src={item.img} alt={item.name} className="w-14 h-14 rounded-lg object-cover bg-gray-100 shadow-sm group-hover:shadow transition" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-rose-950 truncate">{item.name}</h4>
+                      <div className="flex items-center text-xs text-gray-500 mt-1.5 space-x-2">
+                        <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">{item.sold} sold</span>
+                        <span className="flex items-center text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md">
+                          <Star className="w-3 h-3 fill-amber-500 inline mr-1" />{item.rating}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button className="w-full mt-4 py-3 text-xs font-bold text-rose-900 bg-rose-50 rounded-xl hover:bg-rose-100 hover:text-rose-950 transition-colors uppercase tracking-widest shadow-sm">View Full Catalog</button>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'overview' && (
+          <div className="mb-10">
+            <div className="flex justify-between items-end mb-6">
               <div>
-                <h3 className="text-xl font-bold text-rose-950 font-serif">Revenue Analytics</h3>
-                <p className="text-sm font-medium text-rose-900/60 mt-1">Daily fashion drops & seasonal performance</p>
-              </div>
-              <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-100">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">+24.5%</span>
+                <h3 className="text-2xl font-bold text-rose-950 font-serif">Visual Inventory Feed</h3>
+                <p className="text-sm font-medium text-rose-900/60 mt-1">Real-time stock of active apparel variations</p>
               </div>
             </div>
-            
-            {/* CSS Mock Chart */}
-            <div className="h-48 mt-6 flex items-end justify-between space-x-2">
-              {[30, 45, 35, 60, 50, 75, 65, 85, 70, 95, 80, 100].map((val, idx) => (
-                <div key={idx} className="w-full bg-rose-50 rounded-t-md relative group h-full flex items-end">
-                  <div 
-                    className="w-full bg-amber-400 rounded-t-md group-hover:bg-amber-500 transition-all duration-300 relative"
-                    style={{ height: `${val}%` }}
-                  >
-                    {/* Tooltip */}
-                    <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-rose-950 text-white text-xs font-bold py-1.5 px-2.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-lg">
-                      ₹{(val * 1234).toLocaleString('en-IN')}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map(product => (
+                <div key={product.id} className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden group hover:shadow-lg transition duration-300 hover:-translate-y-1">
+                  <div className="relative aspect-[4/5] bg-rose-50 overflow-hidden border-b border-rose-100">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                    <div className="absolute top-3 left-3">
+                       <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-md backdrop-blur-md border ${product.stock > 20 ? 'bg-green-100/90 text-green-800 border-green-200' : 'bg-red-100/90 text-red-800 border-red-200'}`}>
+                          {product.stock} Units Left
+                       </span>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">{product.category}</div>
+                    <h4 className="font-bold text-rose-950 truncate text-lg mb-1">{product.name}</h4>
+                    <div className="flex justify-between items-end mt-3">
+                       <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
+                       <div className="flex space-x-1">
+                         <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                         <button onClick={() => removeProduct(product.id)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                       </div>
+                    </div>
+                    <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
+                       {['S', 'M', 'L'].map(s => (
+                          <span key={s} className="w-7 h-7 rounded-md bg-rose-50 text-rose-950 text-xs font-bold flex items-center justify-center border border-rose-100">{s}</span>
+                       ))}
+                       <div className="flex-1"></div>
+                       <span className="w-5 h-5 rounded-full bg-slate-900 border-2 border-white shadow-sm" title="Black"></span>
+                       <span className="w-5 h-5 rounded-full bg-rose-800 border-2 border-white shadow-sm -ml-2" title="Maroon"></span>
+                       <span className="w-5 h-5 rounded-full bg-amber-100 border-2 border-white shadow-sm -ml-2" title="Cream"></span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[10px] text-rose-900/50 mt-3 font-bold uppercase tracking-widest px-1">
-              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+                ))
+              ) : (
+                <div className="col-span-full py-12 text-center text-rose-900/60 font-medium bg-white rounded-2xl border border-rose-100 border-dashed">
+                  No products found matching "{searchQuery}"
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {/* Best-Sellers Panel (1/3) */}
-          <div className="bg-white p-6 rounded-2xl border border-rose-100 shadow-sm relative flex flex-col h-full">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-rose-950 font-serif">Best-Sellers</h3>
-              <Star className="w-5 h-5 text-amber-500 fill-amber-500 drop-shadow-sm" />
+        {activeSection === 'overview' && (
+          <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
+              <div>
+                <h3 className="text-xl font-bold text-rose-950 font-serif">Order Status Ticker</h3>
+                <p className="text-sm font-medium text-rose-900/60 mt-0.5">Live tracking of merchandise fulfillment</p>
+              </div>
+              <button onClick={() => setActiveSection('orders')} className="text-sm font-bold text-amber-600 hover:text-amber-700 transition uppercase tracking-wider">View All Orders &rarr;</button>
             </div>
-            <div className="space-y-4 flex-1">
-              {[
-                {name: 'Royal Silk Sherwani', sold: 342, rating: 4.9, img: 'https://via.placeholder.com/150'},
-                {name: 'Embroidered Lehenga', sold: 289, rating: 4.8, img: 'https://via.placeholder.com/150'},
-                {name: 'Classic White Kurta', sold: 195, rating: 4.6, img: 'https://via.placeholder.com/150'},
-                {name: 'Velvet Bandhgala', sold: 154, rating: 4.7, img: 'https://via.placeholder.com/150'}
-              ].map((item, i) => (
-                <div key={i} className="flex items-center space-x-4 p-2.5 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 cursor-pointer group">
-                  <img src={item.img} alt={item.name} className="w-14 h-14 rounded-lg object-cover bg-gray-100 shadow-sm group-hover:shadow transition" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-rose-950 truncate">{item.name}</h4>
-                    <div className="flex items-center text-xs text-gray-500 mt-1.5 space-x-2">
-                      <span className="font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">{item.sold} sold</span>
-                      <span className="flex items-center text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md">
-                        <Star className="w-3 h-3 fill-amber-500 inline mr-1" />{item.rating}
-                      </span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
+                    <th className="px-6 py-4 font-bold">Order ID</th>
+                    <th className="px-6 py-4 font-bold">Customer</th>
+                    <th className="px-6 py-4 font-bold">Merchandise</th>
+                    <th className="px-6 py-4 font-bold">Status Badge</th>
+                    <th className="px-6 py-4 font-bold text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rose-50">
+                  {filteredOrders.length > 0 ? filteredOrders.map((order, i) => (
+                    <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
+                      <td className="px-6 py-4 font-bold text-rose-950 text-sm">{order.id}</td>
+                      <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.name}</td>
+                      <td className="px-6 py-4 font-medium text-rose-900/70 text-sm">{order.item}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${order.color}`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.amount}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-rose-900/60 font-medium">
+                        No orders found matching "{searchQuery}"
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'products' && (
+          <div>
+            <div className="flex justify-between items-end mb-6">
+              <div>
+                <p className="text-sm font-medium text-rose-900/60">Manage your product inventory</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map(product => (
+                <div key={product.id} className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden group hover:shadow-lg transition duration-300 hover:-translate-y-1">
+                  <div className="relative aspect-[4/5] bg-rose-50 overflow-hidden border-b border-rose-100">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                    <div className="absolute top-3 left-3">
+                       <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-md backdrop-blur-md border ${product.stock > 20 ? 'bg-green-100/90 text-green-800 border-green-200' : 'bg-red-100/90 text-red-800 border-red-200'}`}>
+                          {product.stock} Units Left
+                       </span>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">{product.category}</div>
+                    <h4 className="font-bold text-rose-950 truncate text-lg mb-1">{product.name}</h4>
+                    <div className="flex justify-between items-end mt-3">
+                       <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
+                       <div className="flex space-x-1">
+                         <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                         <button onClick={() => removeProduct(product.id)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                       </div>
+                    </div>
+                    <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
+                       {['S', 'M', 'L'].map(s => (
+                          <span key={s} className="w-7 h-7 rounded-md bg-rose-50 text-rose-950 text-xs font-bold flex items-center justify-center border border-rose-100">{s}</span>
+                       ))}
+                       <div className="flex-1"></div>
+                       <span className="w-5 h-5 rounded-full bg-slate-900 border-2 border-white shadow-sm" title="Black"></span>
+                       <span className="w-5 h-5 rounded-full bg-rose-800 border-2 border-white shadow-sm -ml-2" title="Maroon"></span>
+                       <span className="w-5 h-5 rounded-full bg-amber-100 border-2 border-white shadow-sm -ml-2" title="Cream"></span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <button className="w-full mt-4 py-3 text-xs font-bold text-rose-900 bg-rose-50 rounded-xl hover:bg-rose-100 hover:text-rose-950 transition-colors uppercase tracking-widest shadow-sm">View Full Catalog</button>
-          </div>
-        </div>
-
-        {/* Row 2: Visual Inventory Feed */}
-        <div className="mb-10">
-          <div className="flex justify-between items-end mb-6">
-            <div>
-              <h3 className="text-2xl font-bold text-rose-950 font-serif">Visual Inventory Feed</h3>
-              <p className="text-sm font-medium text-rose-900/60 mt-1">Real-time stock of active apparel variations</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map(product => (
-              <div key={product.id} className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden group hover:shadow-lg transition duration-300 hover:-translate-y-1">
-                <div className="relative aspect-[4/5] bg-rose-50 overflow-hidden border-b border-rose-100">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
-                  {/* Stock Badge Overlay */}
-                  <div className="absolute top-3 left-3">
-                     <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-md backdrop-blur-md border ${product.stock > 20 ? 'bg-green-100/90 text-green-800 border-green-200' : 'bg-red-100/90 text-red-800 border-red-200'}`}>
-                        {product.stock} Units Left
-                     </span>
-                  </div>
+                ))
+              ) : (
+                <div className="col-span-full py-12 text-center text-rose-900/60 font-medium bg-white rounded-2xl border border-rose-100 border-dashed">
+                  No products yet. Click "Add Product" to get started.
                 </div>
-                <div className="p-5">
-                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">{product.category}</div>
-                  <h4 className="font-bold text-rose-950 truncate text-lg mb-1">{product.name}</h4>
-                  <div className="flex justify-between items-end mt-3">
-                     <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
-                     <div className="flex space-x-1">
-                       <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
-                       <button onClick={() => removeProduct(product.id)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
-                     </div>
-                  </div>
-                  {/* Apparel Variations (Sizes/Colors Mock) */}
-                  <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
-                     {['S', 'M', 'L'].map(s => (
-                        <span key={s} className="w-7 h-7 rounded-md bg-rose-50 text-rose-950 text-xs font-bold flex items-center justify-center border border-rose-100">{s}</span>
-                     ))}
-                     <div className="flex-1"></div>
-                     <span className="w-5 h-5 rounded-full bg-slate-900 border-2 border-white shadow-sm" title="Black"></span>
-                     <span className="w-5 h-5 rounded-full bg-rose-800 border-2 border-white shadow-sm -ml-2" title="Maroon"></span>
-                     <span className="w-5 h-5 rounded-full bg-amber-100 border-2 border-white shadow-sm -ml-2" title="Cream"></span>
-                  </div>
-                </div>
-              </div>
-              ))
-            ) : (
-              <div className="col-span-full py-12 text-center text-rose-900/60 font-medium bg-white rounded-2xl border border-rose-100 border-dashed">
-                No products found matching "{searchQuery}"
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Row 3: Order Status Ticker */}
-        <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
-            <div>
-              <h3 className="text-xl font-bold text-rose-950 font-serif">Order Status Ticker</h3>
-              <p className="text-sm font-medium text-rose-900/60 mt-0.5">Live tracking of merchandise fulfillment</p>
+              )}
             </div>
-            <button className="text-sm font-bold text-amber-600 hover:text-amber-700 transition uppercase tracking-wider">View All Orders &rarr;</button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
-                  <th className="px-6 py-4 font-bold">Order ID</th>
-                  <th className="px-6 py-4 font-bold">Customer</th>
-                  <th className="px-6 py-4 font-bold">Merchandise</th>
-                  <th className="px-6 py-4 font-bold">Status Badge</th>
-                  <th className="px-6 py-4 font-bold text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rose-50">
-                {filteredOrders.length > 0 ? filteredOrders.map((order, i) => (
-                  <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
-                    <td className="px-6 py-4 font-bold text-rose-950 text-sm">{order.id}</td>
-                    <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.name}</td>
-                    <td className="px-6 py-4 font-medium text-rose-900/70 text-sm">{order.item}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${order.color}`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.amount}</td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-rose-900/60 font-medium">
-                      No orders found matching "{searchQuery}"
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        )}
+
+        {activeSection === 'orders' && (
+          <div>
+            <p className="text-sm font-medium text-rose-900/60 mb-6">Track and manage customer orders</p>
+            <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
+                      <th className="px-6 py-4 font-bold">Order ID</th>
+                      <th className="px-6 py-4 font-bold">Customer</th>
+                      <th className="px-6 py-4 font-bold">Merchandise</th>
+                      <th className="px-6 py-4 font-bold">Status Badge</th>
+                      <th className="px-6 py-4 font-bold text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-50">
+                    {filteredOrders.length > 0 ? filteredOrders.map((order, i) => (
+                      <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
+                        <td className="px-6 py-4 font-bold text-rose-950 text-sm">{order.id}</td>
+                        <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.name}</td>
+                        <td className="px-6 py-4 font-medium text-rose-900/70 text-sm">{order.item}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${order.color}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.amount}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-8 text-center text-rose-900/60 font-medium">
+                          No orders found matching "{searchQuery}"
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeSection === 'customers' && (
+          <div>
+            <p className="text-sm font-medium text-rose-900/60 mb-6">View your customer base and loyalty tiers</p>
+            <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
+                      <th className="px-6 py-4 font-bold">Customer</th>
+                      <th className="px-6 py-4 font-bold">Email</th>
+                      <th className="px-6 py-4 font-bold">Orders</th>
+                      <th className="px-6 py-4 font-bold">Total Spent</th>
+                      <th className="px-6 py-4 font-bold">Loyalty Tier</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-50">
+                    {mockCustomers.map((customer, i) => (
+                      <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
+                        <td className="px-6 py-4 font-bold text-rose-950 text-sm">{customer.name}</td>
+                        <td className="px-6 py-4 text-rose-900/70 text-sm">{customer.email}</td>
+                        <td className="px-6 py-4 text-rose-950 font-bold text-sm">{customer.orders}</td>
+                        <td className="px-6 py-4 font-bold text-rose-950 font-serif text-sm">{customer.spent}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${customer.color}`}>
+                            {customer.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
