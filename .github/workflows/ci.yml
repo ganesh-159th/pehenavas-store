@@ -37,10 +37,7 @@ jobs:
       run: npx vitest run
 
     - name: 🌲 Run Cypress E2E Tests
-      uses: cypress-io/github-action@v6
-      with:
-        start: npm run dev
-        wait-on: 'http://localhost:3000'
+      run: npx start-server-and-test 'npm run dev' http://localhost:3000 'npx cypress run'
 
     # Artifact Collection: Store screenshots if tests fail
     - name: 📸 Upload Cypress Screenshots
