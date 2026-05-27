@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PRODUCTS } from '../data/products.js';
+import { showAlert } from '../utils/alert';
 
 export const useStore = create(
   persist(
@@ -18,9 +19,15 @@ export const useStore = create(
         products: [{ ...product, id: Date.now().toString() }, ...state.products]
       })),
 
-      removeProduct: (id) => set((state) => ({
-        products: state.products.filter(p => p.id !== id)
-      })),
+      removeProduct: (id) => {
+        set((state) => {
+          const product = state.products.find(p => p.id === id);
+          if (product) {
+            setTimeout(() => showAlert(`"${product.name}" removed from catalog.`, 'danger'), 0);
+          }
+          return { products: state.products.filter(p => p.id !== id) };
+        });
+      },
 
       // Drawer State
       openCart: () => set({ isCartOpen: true }),
@@ -58,7 +65,7 @@ export const useStore = create(
       removeFromCart: (productId, size) => {
         set((state) => ({
           cart: state.cart.filter(
-            (item) => !(item.id === productId && item.size === size)
+            (i) => !(i.id === productId && i.size === size)
           ),
         }));
       },
@@ -66,7 +73,7 @@ export const useStore = create(
       updateItemQuantity: (id, size, qty) => {
         if (qty < 1) {
           set((state) => ({
-            cart: state.cart.filter(item => !(item.id === id && item.size === size))
+            cart: state.cart.filter((i) => !(i.id === id && i.size === size))
           }));
           return;
         }

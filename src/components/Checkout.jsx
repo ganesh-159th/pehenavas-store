@@ -6,6 +6,7 @@ import OrderSummary from './OrderSummary.jsx';
 import { useUser } from '../hooks/useUser';
 import { Navigate, Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { showAlert } from '../utils/alert';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
@@ -89,6 +90,7 @@ const Checkout = () => {
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
+            showAlert('Please fill in all required fields correctly.', 'warning');
             return;
         }
 
@@ -110,6 +112,7 @@ const Checkout = () => {
             });
             setShowOrderSummary(true);
             clearCart();
+            showAlert('Order placed successfully! 🎉', 'success');
         }, 1000);
     };
 

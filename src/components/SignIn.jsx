@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../hooks/useUser';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { showAlert } from '../utils/alert';
 
 const RoyalLotus = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -24,6 +25,13 @@ const SignIn = () => {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const isVisible = useFadeIn();
+
+  useEffect(() => {
+    if (location.state?.message) {
+      showAlert(location.state.message, 'warning');
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state?.message]);
 
   const validate = () => {
     const newErrors = {};
@@ -53,11 +61,14 @@ const SignIn = () => {
 
   const handleSignIn = (e) => {
     e.preventDefault();
-    if (validate()) {
-      const userName = email.split('@')[0];
-      login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
-      navigate('/');
+    if (!validate()) {
+      showAlert('Please fix the form errors before signing in.', 'warning');
+      return;
     }
+    const userName = email.split('@')[0];
+    login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
+    showAlert('Signed in successfully! Welcome back.', 'success');
+    navigate('/');
   };
 
   return (
@@ -85,12 +96,6 @@ const SignIn = () => {
           <div className="h-1 bg-gradient-to-r from-rose-950 via-amber-500 to-rose-950"></div>
           
           <div className="p-8">
-            {location.state?.message && (
-              <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                <p className="text-amber-800 text-sm font-medium">{location.state.message}</p>
-              </div>
-            )}
             
             <h2 className="text-xl font-bold text-rose-950 mb-6">Welcome Back</h2>
             

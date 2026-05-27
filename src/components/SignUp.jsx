@@ -3,6 +3,7 @@ import { useUser } from '../hooks/useUser';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { showAlert } from '../utils/alert';
 
 const RoyalLotus = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -63,10 +64,13 @@ const SignUp = () => {
 
   const handleSignUp = (e) => {
     e.preventDefault();
-    if (validate()) {
-      login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
-      navigate('/');
+    if (!validate()) {
+      showAlert('Please fix the form errors before creating an account.', 'warning');
+      return;
     }
+    login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
+    showAlert('Account created successfully! Welcome aboard.', 'success');
+    navigate('/');
   };
 
   return (

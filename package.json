@@ -6,6 +6,8 @@
   "scripts": {
     "start": "npm run dev",
     "dev": "vite --open --port 3000",
+    "server": "node server.js",
+    "dev:full": "node server.js & vite --open --port 3000",
     "build": "vite build",
     "postinstall": "npm run build",
     "clean": "rm -rf node_modules package-lock.json dist && npm install",
@@ -17,6 +19,8 @@
     "test:all": "npm run lint && npm run build && npx vitest run --coverage && npx start-server-and-test 'npm run dev' http://localhost:3000 'npx cypress run'"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
