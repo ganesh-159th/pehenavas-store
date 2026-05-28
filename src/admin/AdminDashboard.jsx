@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { showAlert } from '../utils/alert';
 
 const mockOrders = [
   {id: '#ORD-7352', name: 'Priya Sharma', item: 'Royal Silk Sherwani', status: 'Pending Packaging', color: 'bg-amber-100 text-amber-800 border-amber-200', amount: '₹12,499'},
@@ -23,7 +24,6 @@ export default function AdminDashboard() {
   const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct } = useStore();
   const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [successToast, setSuccessToast] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const { register, handleSubmit, reset } = useForm({
@@ -76,15 +76,29 @@ export default function AdminDashboard() {
   };
 
   const onSubmit = (data) => {
-    addProduct({ ...data, price: Number(data.price), stock: Number(data.stock), image: imagePreview });
-    
-    // Clear the form fields and image preview automatically
+    const price = Number(data.price);
+    const stock = Number(data.stock);
+
+    if (!data.name.trim()) {
+      showAlert('Product name is required.', 'warning');
+      return;
+    }
+    if (price < 0) {
+      showAlert('Price must be a positive number.', 'warning');
+      return;
+    }
+    if (stock < 0) {
+      showAlert('Stock cannot be negative.', 'warning');
+      return;
+    }
+
+    addProduct({ ...data, price, stock, image: imagePreview });
+
     reset();
     setImagePreview('');
-    // setShowAddModal(false); // Uncomment if you prefer the modal to close immediately
-    
-    setSuccessToast('Product added successfully!');
-    setTimeout(() => setSuccessToast(''), 3000);
+    setShowAddModal(false);
+
+    showAlert('Product added successfully!', 'success');
   };
 
   const filteredProducts = products.filter(product =>
@@ -102,13 +116,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#faf6f0] font-sans flex text-gray-900">
-      {/* Success Toast */}
-      {successToast && (
-        <div className="fixed top-6 right-6 z-50 bg-green-50 text-green-800 px-6 py-4 rounded-xl shadow-2xl flex items-center space-x-3 border border-green-200 animate-slide-in-right">
-          <CheckCircle2 className="w-6 h-6 text-green-500" />
-          <span className="font-bold">{successToast}</span>
-        </div>
-      )}
 
       {/* Add Product Modal */}
       {showAddModal && (

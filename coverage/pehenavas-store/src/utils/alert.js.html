@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for pehenavas-store/src/components/Orders.jsx</title>
+    <title>Code coverage report for pehenavas-store/src/utils/alert.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../../prettify.css" />
     <link rel="stylesheet" href="../../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../../index.html">All files</a> / <a href="index.html">pehenavas-store/src/components</a> Orders.jsx</h1>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">pehenavas-store/src/utils</a> alert.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">95.45% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>43/43</span>
+                <span class='fraction'>42/44</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">60% </span>
+                <span class="strong">77.77% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/5</span>
+                <span class='fraction'>7/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">95.45% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>43/43</span>
+                <span class='fraction'>42/44</span>
             </div>
         
             
@@ -110,39 +110,14 @@
 <a name='L45'></a><a href='#L45'>45</a>
 <a name='L46'></a><a href='#L46'>46</a>
 <a name='L47'></a><a href='#L47'>47</a>
-<a name='L48'></a><a href='#L48'>48</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -156,54 +131,100 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
-import { ORDERS } from '../data/orders';
-import { formatINR } from '../utils';
-import { useFadeIn } from '../hooks/useFadeIn';
-&nbsp;
-const Orders = () =&gt; {
-  const isVisible = useFadeIn();
-&nbsp;
-  return (
-    &lt;div className={`bg-white rounded-xl shadow-md border border-rose-100 overflow-hidden min-h-[600px] transition-all duration-1000 ease-out transform ${<span class="branch-0 cbranch-no" title="branch not covered" >isVisible ? 'opacity-100 translate-y-0' : '</span>opacity-0 translate-y-12'}`}&gt;
-      &lt;div className="p-4 border-b border-rose-100 bg-rose-50/50"&gt;
-        &lt;h2 className="mx-auto text-2xl font-serif font-bold text-rose-950"&gt;Your Orders&lt;/h2&gt;
-      &lt;/div&gt;
-      &lt;div className="p-6 lg:p-10 flex flex-col gap-8"&gt;
-        {ORDERS.map((order) =&gt; (
-          &lt;div key={order.id} className="border rounded-lg p-6"&gt;
-            &lt;div className="flex justify-between items-start mb-4"&gt;
-              &lt;div&gt;
-                &lt;p className="font-bold text-lg"&gt;Order #{order.id}&lt;/p&gt;
-                &lt;p className="text-sm text-gray-500"&gt;Date: {order.date}&lt;/p&gt;
-              &lt;/div&gt;
-              &lt;div className="text-right"&gt;
-                &lt;p className={`font-bold ${order.status === 'Delivered' ? <span class="branch-0 cbranch-no" title="branch not covered" >'text-green-600' : 'text-yellow-600'}</span>`}&gt;
-                  {order.status}
-                &lt;/p&gt;
-                &lt;p className="text-lg font-bold"&gt;{formatINR(order.total)}&lt;/p&gt;
-              &lt;/div&gt;
-            &lt;/div&gt;
-            &lt;div className="flex flex-col gap-4"&gt;
-              {order.items.map((item) =&gt; (
-                &lt;div key={item.id} className="flex items-center gap-4"&gt;
-                  &lt;img src={item.image} alt={item.name} className="w-20 h-24 object-cover rounded-md" /&gt;
-                  &lt;div&gt;
-                    &lt;p className="font-medium"&gt;{item.name}&lt;/p&gt;
-                    &lt;p className="text-sm text-gray-500"&gt;Qty: {item.qty}&lt;/p&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
-              ))}
-            &lt;/div&gt;
-          &lt;/div&gt;
-        ))}
-      &lt;/div&gt;
-    &lt;/div&gt;
-  );
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const TYPES = {
+  success: {
+    icon: '🟢',
+  },
+  danger: {
+    icon: '🔴',
+  },
+  warning: {
+    icon: '🟡',
+  },
 };
 &nbsp;
-export default Orders;
+let container = null;
+&nbsp;
+function ensureContainer() {
+  if (!container || !document.body.contains(container)) {
+    container = document.createElement('div');
+    container.id = 'global-alert-container';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+&nbsp;
+export function showAlert(message, type = 'success') {
+  const config = TYPES[type] <span class="branch-0 cbranch-no" title="branch not covered" >|| TYPES.success;</span>
+  const el = document.createElement('div');
+  el.className = 'global-alert-card';
+&nbsp;
+  el.innerHTML = `
+    &lt;span class="global-alert-icon"&gt;${config.icon}&lt;/span&gt;
+    &lt;span class="global-alert-msg"&gt;${message}&lt;/span&gt;
+    &lt;button class="global-alert-close" aria-label="Dismiss"&gt;&amp;times;&lt;/button&gt;
+  `;
+&nbsp;
+  el.querySelector('.global-alert-close').addEventListener('click', (e) =&gt; {
+<span class="cstat-no" title="statement not covered" >    e.stopPropagation();</span>
+<span class="cstat-no" title="statement not covered" >    dismiss(el);</span>
+  });
+&nbsp;
+  ensureContainer().appendChild(el);
+&nbsp;
+  requestAnimationFrame(() =&gt; el.classList.add('global-alert-visible'));
+&nbsp;
+  setTimeout(() =&gt; dismiss(el), 4000);
+}
+&nbsp;
+function dismiss(el) {
+  if (!el.parentNode) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
+  el.classList.remove('global-alert-visible');
+  el.classList.add('global-alert-hiding');
+  el.addEventListener('transitionend', <span class="fstat-no" title="function not covered" >() =&gt; el.remove(),</span> { once: true });
+}
+&nbsp;
+window.showAlert = showAlert;
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
