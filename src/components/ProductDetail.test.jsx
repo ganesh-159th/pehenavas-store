@@ -36,6 +36,7 @@ vi.mock('../data/products.js', () => ({
       id: '1',
       name: 'Royal Rajputana Poshak',
       price: 15000,
+      originalPrice: 18000,
       description: 'A stunning traditional poshak.',
       image: 'poshak.jpg',
       rating: 4.5,

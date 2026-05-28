@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { BrowserRouter } from 'react-router-dom';
 import Account from './Account';
 import { useUser } from '../hooks/useUser';
 
@@ -17,13 +18,13 @@ vi.mock('./Orders', () => ({
 describe('Account Component', () => {
   it('shows sign-in message when user is NOT logged in', () => {
     useUser.mockReturnValue({ user: null }); // Simulate logged out
-    render(<Account />);
+    render(<Account />, { wrapper: BrowserRouter });
     expect(screen.getByText('Please sign in to view your account.')).toBeInTheDocument();
   });
 
   it('shows welcome message and orders when user IS logged in', () => {
     useUser.mockReturnValue({ user: { name: 'Ganesh' } }); // Simulate logged in
-    render(<Account />);
+    render(<Account />, { wrapper: BrowserRouter });
     expect(screen.getByText('Welcome, Ganesh')).toBeInTheDocument();
     expect(screen.getByTestId('mock-orders')).toBeInTheDocument();
   });

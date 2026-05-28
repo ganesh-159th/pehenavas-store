@@ -8,6 +8,7 @@ export const useStore = create(
     (set) => ({
       cart: [],
       wishlist: [],
+      orders: [],
       isCartOpen: false,
       isAdminAuthenticated: false,
       toastMessage: null,
@@ -16,7 +17,15 @@ export const useStore = create(
       products: PRODUCTS,
 
       addProduct: (product) => set((state) => ({
-        products: [{ ...product, id: Date.now().toString() }, ...state.products]
+        products: [{
+          ...product,
+          id: Date.now().toString(),
+          rating: product.rating ?? 0,
+          reviews: product.reviews ?? 0,
+          originalPrice: product.originalPrice ?? product.price,
+          colors: product.colors ?? [],
+          description: product.description ?? '',
+        }, ...state.products]
       })),
 
       removeProduct: (id) => {
@@ -28,6 +37,17 @@ export const useStore = create(
           return { products: state.products.filter(p => p.id !== id) };
         });
       },
+
+      syncProducts: (serverProducts) => set((state) => {
+        const serverMap = new Map(serverProducts.map(p => [String(p.id), p]));
+        const merged = state.products.map(p => serverMap.get(String(p.id)) || p);
+        serverProducts.forEach(sp => {
+          if (!merged.find(m => String(m.id) === String(sp.id))) {
+            merged.push(sp);
+          }
+        });
+        return { products: merged };
+      }),
 
       // Drawer State
       openCart: () => set({ isCartOpen: true }),
@@ -98,6 +118,15 @@ export const useStore = create(
       clearCart: () => set({ cart: [] }),
       hideToast: () => set({ toastMessage: null }),
 
+      // Orders
+      addOrder: (order) => set((state) => ({
+        orders: [order, ...state.orders]
+      })),
+
+      // Server Sync Status
+      serverConnected: false,
+      setServerConnected: (connected) => set({ serverConnected: connected }),
+
       // Admin Auth
       adminLogin: (username, password) => {
         if (username === 'admin' && password === 'admin123') {
@@ -119,7 +148,17 @@ export const useStore = create(
     }),
     {
       name: 'pehenavas-storage',
-      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, isAdminAuthenticated: state.isAdminAuthenticated, products: state.products }),
+      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, orders: state.orders, isAdminAuthenticated: state.isAdminAuthenticated }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...persisted,
+        products: [
+          ...(persisted.products || []).filter(
+            p => typeof p.id === 'string' && !current.products.find(cp => String(cp.id) === String(p.id))
+          ),
+          ...current.products,
+        ],
+      }),
     }
   )
 );

@@ -1,12 +1,12 @@
 import React, { useMemo, useReducer, useEffect } from 'react';
-import { ShoppingCart, Search, Star, X, ChevronRight, ChevronLeft, Filter } from 'lucide-react';
-import { PRODUCTS } from '../data/products.js';
+import { ShoppingCart, Star, X, ChevronRight, ChevronLeft, Filter } from 'lucide-react';
 import { CATEGORIES } from '../data/categories.js';
 import { BANNERS } from '../data/banners.js';
 import { formatINR } from '../utils.js';
 import { useCart } from '../hooks/useCart';
 import { Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { useStore } from '../store/useStore';
 
 const initialState = {
     activeCategory: "All",
@@ -43,6 +43,8 @@ function reducer(state, action) {
 
 const Home = ({ searchResults, searchQuery }) => {
     const { addToCart } = useCart();
+    const storeProducts = useStore((state) => state.products);
+    const products = searchQuery ? searchResults : storeProducts;
     const [state, dispatch] = useReducer(reducer, initialState);
     const {
         activeCategory,
@@ -82,7 +84,6 @@ const Home = ({ searchResults, searchQuery }) => {
 
     // --- LOGIC ---
     const productsToDisplay = useMemo(() => {
-        const products = searchQuery ? searchResults : PRODUCTS;
         let filtered = products.filter(product => {
             const matchesCategory = activeCategory === "All" || product.category === activeCategory;
             const matchesMinPrice = minPrice === '' || product.price >= Number(minPrice);
@@ -93,7 +94,7 @@ const Home = ({ searchResults, searchQuery }) => {
         if (sortBy === 'price-desc') filtered = [...filtered].sort((a, b) => b.price - a.price);
         if (sortBy === 'rating') filtered = [...filtered].sort((a, b) => b.rating - a.rating);
         return filtered;
-    }, [searchQuery, searchResults, activeCategory, minPrice, maxPrice, sortBy]);
+    }, [products, activeCategory, minPrice, maxPrice, sortBy]);
 
     const handleAddToCart = (product) => {
         addToCart(product, selectedSize);
@@ -174,7 +175,12 @@ const Home = ({ searchResults, searchQuery }) => {
 
                     {/* --- PRODUCT GRID --- */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-                        {productsToDisplay.map(product => (
+                        {productsToDisplay.length === 0 ? (
+                          <div className="col-span-full py-16 text-center">
+                            <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
+                          </div>
+                        ) : (
+                        productsToDisplay.map(product => (
                             <div
                                 key={product.id}
                                 className="bg-white/60 backdrop-blur-sm rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-rose-100/80 overflow-hidden group relative"
@@ -205,7 +211,7 @@ const Home = ({ searchResults, searchQuery }) => {
                                     <ShoppingCart className="w-5 h-5" /> <span className="hidden sm:inline-block">Quick Add</span>
                                 </button>
                             </div>
-                        ))}
+                        )))}
                     </div>
             {quickViewProduct && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => dispatch({ type: 'SET_QUICK_VIEW_PRODUCT', payload: null })}>

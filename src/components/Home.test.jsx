@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Home from './Home';
 import { useCart } from '../hooks/useCart';
@@ -30,6 +30,9 @@ describe('Home Component', () => {
   it('renders products and handles the Quick Add to cart flow', () => {
     // Render with empty search queries so it defaults to the full product list
     render(<Home searchResults={[]} searchQuery="" />, { wrapper: BrowserRouter });
+
+    // Advance timers to trigger image-loading fallback
+    act(() => { vi.advanceTimersByTime(2100); });
 
     // 1. Verify the component rendered successfully
     expect(screen.getByText('Royal Rajwadi Poshak')).toBeInTheDocument();

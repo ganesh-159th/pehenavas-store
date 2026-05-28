@@ -152,7 +152,7 @@ describe('SignUp Component', () => {
       expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
       
       // Should navigate to Home
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 });

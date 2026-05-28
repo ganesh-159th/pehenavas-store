@@ -68,7 +68,8 @@ const SignIn = () => {
     const userName = email.split('@')[0];
     login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
     showAlert('Signed in successfully! Welcome back.', 'success');
-    navigate('/');
+    const from = location.state?.from || '/';
+    navigate(from, { replace: true });
   };
 
   return (

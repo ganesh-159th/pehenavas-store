@@ -12,6 +12,7 @@ const ProductDetail = () => {
     const isVisible = useFadeIn();
     const { addToCart } = useCart();
     const [selectedSize, setSelectedSize] = useState('M');
+    const [selectedColor, setSelectedColor] = useState(null);
 
     // Find the product, ensuring we convert both IDs to strings for a safe match
     const product = PRODUCTS.find(p => String(p.id) === String(id));
@@ -80,9 +81,31 @@ const ProductDetail = () => {
                             ))}
                         </div>
                     </div>
+                    {product.colors && (
+                      <div className="mt-6">
+                        <p className="text-gray-500 text-sm">Color:</p>
+                        <div className="flex gap-2 mt-2">
+                          {product.colors.map(c => (
+                            <button
+                              key={c}
+                              onClick={() => setSelectedColor(c)}
+                              className={`px-4 py-2 rounded-md border-2 text-sm font-medium transition-colors ${
+                                selectedColor === c
+                                  ? 'bg-rose-950 text-white border-rose-950'
+                                  : 'bg-white hover:border-rose-400 border-rose-200 text-gray-700'
+                              }`}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-4 mt-8">
                         <span className="text-5xl font-serif font-bold text-amber-600">{formatINR(product.price)}</span>
-                        <span className="text-gray-400 line-through">{formatINR(product.price * 1.2)}</span>
+                        {product.originalPrice && (
+                          <span className="text-gray-400 line-through">{formatINR(product.originalPrice)}</span>
+                        )}
                     </div>
                     <button
                         onClick={handleAddToCart}

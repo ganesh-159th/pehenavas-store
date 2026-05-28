@@ -1,5 +1,5 @@
-import React from 'react';
-import { Heart, ShoppingCart, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, ShoppingCart, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useCart } from '../hooks/useCart';
@@ -10,6 +10,14 @@ const Wishlist = () => {
   const { wishlist, toggleWishlist } = useStore();
   const { addToCart } = useCart();
   const isVisible = useFadeIn();
+  const [sizeModal, setSizeModal] = useState(null);
+  const [selectedSize, setSelectedSize] = useState('M');
+
+  const handleAddToCartWithSize = (product) => {
+    addToCart(product, selectedSize);
+    setSizeModal(null);
+    setSelectedSize('M');
+  };
 
   return (
     <div className={`bg-white rounded-2xl shadow-xl border border-rose-100 overflow-hidden min-h-[400px] transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
@@ -63,13 +71,44 @@ const Wishlist = () => {
                 <Trash2 className="w-4 h-4" />
               </button>
               <button
-                onClick={(e) => { e.preventDefault(); addToCart(product, 'M'); }}
+                onClick={(e) => { e.preventDefault(); setSizeModal(product); setSelectedSize('M'); }}
                 className="absolute bottom-2 left-2 right-2 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-rose-950 text-amber-400 text-xs font-bold py-2 px-3 rounded-md hover:bg-rose-900 shadow-lg z-10 flex items-center justify-center gap-1.5"
               >
                 <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {sizeModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSizeModal(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-rose-950 font-serif">Select Size</h3>
+              <button onClick={() => setSizeModal(null)} className="text-gray-400 hover:text-rose-950">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-4">{sizeModal.name}</p>
+            <div className="flex gap-2 mb-6">
+              {['S', 'M', 'L', 'XL'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedSize(s)}
+                  className={`w-12 h-12 rounded-full border-2 transition-colors ${selectedSize === s ? 'bg-rose-950 text-white border-rose-950' : 'bg-white hover:border-rose-400 border-rose-200'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => handleAddToCartWithSize(sizeModal)}
+              className="w-full bg-rose-950 text-amber-400 font-bold py-3 px-4 rounded-md hover:bg-rose-900 transition-all flex items-center justify-center gap-2"
+            >
+              <ShoppingCart className="w-5 h-5" /> Add to Cart
+            </button>
+          </div>
         </div>
       )}
     </div>
