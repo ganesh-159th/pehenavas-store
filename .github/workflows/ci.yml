@@ -34,6 +34,8 @@ jobs:
       run: npm run build
 
     - name: 🧪 Run Vitest Unit Tests
+      env:
+        NODE_OPTIONS: "--max-old-space-size=4096"
       run: npx vitest run
 
     - name: 🌲 Run Cypress E2E Tests
