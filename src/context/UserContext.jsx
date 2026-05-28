@@ -1,30 +1,64 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut,
+} from 'firebase/auth';
+import { auth } from '../services/firebase';
 
 export const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
-    // 1. Initialize from localStorage (if data exists)
-    const [user, setUser] = useState(() => {
-        const savedUser = localStorage.getItem('pehenavas_user');
-        return savedUser ? JSON.parse(savedUser) : null;
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
     });
+    return unsubscribe;
+  }, []);
 
-    // 2. Automatically save or clear localStorage when the user logs in/out
-    useEffect(() => {
-        if (user) {
-            localStorage.setItem('pehenavas_user', JSON.stringify(user));
-        } else {
-            localStorage.removeItem('pehenavas_user');
-        }
-    }, [user]);
+  const login = async (email, password) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const fbUser = cred.user;
+    setUser({
+      uid: fbUser.uid,
+      email: fbUser.email,
+      name: fbUser.displayName || fbUser.email.split('@')[0],
+    });
+  };
 
-    const login = (userData) => setUser(userData);
-    const logout = () => setUser(null);
+  const signup = async (name, email, password) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: name });
+    setUser({
+      uid: cred.user.uid,
+      email: cred.user.email,
+      name,
+    });
+  };
 
-    return (
-        <UserContext.Provider value={{ user, login, logout }}>
-            {children}
-        </UserContext.Provider>
-    );
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
+  };
+
+  return (
+    <UserContext.Provider value={{ user, loading, login, signup, logout }}>
+      {children}
+    </UserContext.Provider>
+  );
 };

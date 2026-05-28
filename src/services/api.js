@@ -1,33 +1,15 @@
-const API_BASE = 'http://localhost:3001/api';
+import { productsService } from './db';
 
 export const adminApi = {
   async getProducts() {
-    const res = await fetch(`${API_BASE}/products`);
-    if (!res.ok) throw new Error('Failed to fetch products');
-    return res.json();
+    return productsService.getAll();
   },
 
   async addProduct(product) {
-    const res = await fetch(`${API_BASE}/products/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(product),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to add product');
-    }
-    return res.json();
+    return productsService.add(product);
   },
 
   async removeProduct(id) {
-    const res = await fetch(`${API_BASE}/products/remove/${id}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to remove product');
-    }
-    return res.json();
+    await productsService.remove(id);
   },
 };

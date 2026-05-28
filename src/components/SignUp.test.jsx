@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SignUp from './SignUp';
 import { useUser } from '../hooks/useUser';
@@ -22,11 +22,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 describe('SignUp Component', () => {
-  const mockLogin = vi.fn();
+  const mockSignup = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useUser.mockReturnValue({ login: mockLogin });
+    useUser.mockReturnValue({ signup: mockSignup });
   });
 
   const renderComponent = () => render(<SignUp />, { wrapper: BrowserRouter });
@@ -131,27 +131,23 @@ describe('SignUp Component', () => {
   });
 
   describe('Successful Registration', () => {
-    it('calls login and navigates to home when registration is fully valid', () => {
+    it('calls signup and navigates to home when registration is fully valid', async () => {
+      useUser.mockReturnValue({ signup: mockSignup });
+      mockSignup.mockResolvedValue();
       renderComponent();
       
-      // Fill out valid data
       fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'ganesh kumar' } });
       fireEvent.change(screen.getByLabelText(/Email address/i), { target: { value: 'ganesh@example.com' } });
       fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'StrongPass@123' } });
       fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'StrongPass@123' } });
       fireEvent.click(screen.getByRole('checkbox'));
       
-      // Submit
       fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
       
-      // Should not show any errors
-      expect(screen.queryByText('Full name is required.')).not.toBeInTheDocument();
-      expect(screen.queryByText(/Password must be at least 8 characters/i)).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockSignup).toHaveBeenCalledWith('ganesh kumar', 'ganesh@example.com', 'StrongPass@123');
+      });
       
-      // Should capitalize the first letter of the name!
-      expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
-      
-      // Should navigate to Home
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });

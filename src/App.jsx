@@ -56,9 +56,11 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-      fetch('http://localhost:3001/api/products')
-        .then(res => { if (res.ok) setServerConnected(true); })
-        .catch(() => { /* server not available */ });
+      import('./services/db').then(({ productsService }) => {
+        productsService.getAll()
+          .then(() => setServerConnected(true))
+          .catch(() => {});
+      }).catch(() => {});
     }, [setServerConnected]);
 
     const searchResults = useMemo(() => {

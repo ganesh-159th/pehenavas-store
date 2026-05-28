@@ -22,7 +22,7 @@ const mockCustomers = [
 ];
 
 export default function AdminDashboard() {
-  const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct, serverConnected, setServerConnected } = useStore();
+  const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct } = useStore();
   const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -44,12 +44,9 @@ export default function AdminDashboard() {
     syncWithServer()
       .then((serverProducts) => {
         useStore.getState().syncProducts(serverProducts);
-        setServerConnected(true);
       })
-      .catch(() => {
-        setServerConnected(false);
-      });
-  }, [syncWithServer, setServerConnected]);
+      .catch(() => {});
+  }, [syncWithServer]);
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -228,19 +225,6 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-8">
-        {/* Sync Status Banner */}
-        {!serverConnected && (
-          <div className="mb-6 bg-amber-50 border-2 border-amber-300 text-amber-800 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span>Sandbox Mode — Backend server not connected. Changes are local only.</span>
-          </div>
-        )}
-        {serverConnected && (
-          <div className="mb-6 bg-green-50 border-2 border-green-300 text-green-800 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
-            <span>Live Connection — Backend server connected. Data is synced.</span>
-          </div>
-        )}
         <header className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-rose-950 font-serif capitalize">{activeSection}</h2>
           <div className="flex space-x-4">
@@ -258,17 +242,15 @@ export default function AdminDashboard() {
             </button>
 <button onClick={async () => {
                setSyncing(true);
-               await syncWithServer()
-                 .then((serverProducts) => {
-                   useStore.getState().syncProducts(serverProducts);
-                   setServerConnected(true);
-                   showAlert('Products synced with server.', 'success');
-                 })
-                 .catch(() => {
-                   setServerConnected(false);
-                   showAlert('Could not connect to server. Using local data.', 'warning');
-                 })
-                 .finally(() => setSyncing(false));
+               try {
+                 const serverProducts = await syncWithServer();
+                 useStore.getState().syncProducts(serverProducts);
+                 showAlert('Products synced with server.', 'success');
+               } catch {
+                 showAlert('Could not connect to server. Using local data.', 'warning');
+               } finally {
+                 setSyncing(false);
+               }
              }} disabled={syncing} className="flex items-center space-x-2 bg-rose-100 text-rose-950 px-4 py-2.5 rounded-full hover:bg-rose-200 transition shadow-sm font-bold text-sm">
                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                <span>{syncing ? 'Syncing...' : 'Sync'}</span>
