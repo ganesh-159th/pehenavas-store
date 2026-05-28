@@ -6,10 +6,10 @@ app.use(cors());
 app.use(express.json());
 
 let products = [
-  { id: 1, name: 'Royal Silk Sherwani', price: 12499 },
-  { id: 2, name: 'Classic White Kurta', price: 2999 },
-  { id: 3, name: 'Velvet Bandhgala', price: 8999 },
-  { id: 4, name: 'Embroidered Lehenga', price: 14999 },
+  { id: 1, name: 'Royal Silk Sherwani', price: 12499, description: 'Luxurious silk sherwani for weddings.', category: 'Men', image: '', stock: 50, colors: ['Ivory', 'Gold'] },
+  { id: 2, name: 'Classic White Kurta', price: 2999, description: 'Comfortable cotton kurta.', category: 'Men', image: '', stock: 100, colors: ['White', 'Beige'] },
+  { id: 3, name: 'Velvet Bandhgala', price: 8999, description: 'Elegant velvet bandhgala jacket.', category: 'Men', image: '', stock: 30, colors: ['Black', 'Maroon'] },
+  { id: 4, name: 'Embroidered Lehenga', price: 14999, description: 'Beautiful embroidered bridal lehenga.', category: 'Women', image: '', stock: 20, colors: ['Red', 'Pink', 'Gold'] },
 ];
 
 let nextId = 100;
@@ -20,7 +20,7 @@ app.get('/api/products', (_req, res) => {
 });
 
 app.post('/api/products/add', (req, res) => {
-  const { name, price } = req.body;
+  const { name, price, description, category, image, stock, colors } = req.body;
 
   if (!name || !name.trim()) {
     console.log('[ADMIN ACTION] 🟡 VALIDATION: Product name is required');
@@ -31,7 +31,16 @@ app.post('/api/products/add', (req, res) => {
     return res.status(400).json({ error: 'Price must be a positive number' });
   }
 
-  const product = { id: nextId++, name: name.trim(), price: Number(price) };
+  const product = {
+    id: nextId++,
+    name: name.trim(),
+    price: Number(price),
+    description: description || '',
+    category: category || 'Uncategorized',
+    image: image || '',
+    stock: stock != null ? Number(stock) : 0,
+    colors: colors || []
+  };
   products.push(product);
   console.log(`[ADMIN ACTION] 🟢 SUCCESS: Product "${product.name}" added (₹${product.price})`);
   res.status(201).json(product);

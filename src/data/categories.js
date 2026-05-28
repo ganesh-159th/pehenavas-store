@@ -1,1 +1,1 @@
-export const CATEGORIES = ["All", "Women", "Men", "Jewellery", "Footwear"];
+export const CATEGORIES = ["All", "Women", "Men", "Jewellery", "Footwear", "Accessories"];

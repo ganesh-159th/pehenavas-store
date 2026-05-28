@@ -7,10 +7,12 @@ import { useUser } from '../hooks/useUser';
 import { Navigate, Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
+import { useStore } from '../store/useStore';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
     const { user } = useUser();
+    const { addOrder } = useStore();
     const [paymentMethod, setPaymentMethod] = useState("upi");
     const [upiId, setUpiId] = useState("");
     const [upiIdVerified, setUpiIdVerified] = useState(null);
@@ -99,7 +101,17 @@ const Checkout = () => {
             const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
             const today = new Date();
             const deliveryDate = new Date(today);
-            deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3); // 3-5 days
+            deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
+            const order = { 
+                id: orderId,
+                date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
+                delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }),
+                items: [...cart],
+                total: cartTotal,
+                status: 'Confirmed',
+                address: { ...address }
+            };
+            addOrder(order);
             setFinalOrder({ 
                 cart: [...cart], 
                 cartTotal,

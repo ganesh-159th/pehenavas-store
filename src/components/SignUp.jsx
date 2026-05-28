@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useUser } from '../hooks/useUser';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
@@ -18,6 +18,7 @@ const RoyalLotus = ({ className }) => (
 const SignUp = () => {
   const { login } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +71,8 @@ const SignUp = () => {
     }
     login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
     showAlert('Account created successfully! Welcome aboard.', 'success');
-    navigate('/');
+    const from = location.state?.from || '/';
+    navigate(from, { replace: true });
   };
 
   return (

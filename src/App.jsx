@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy, useMemo } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
+import ErrorBoundary from './components/ErrorBoundary';
 const Home = lazy(() => import('./components/Home'));
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp';
@@ -32,12 +33,18 @@ export default function App() {
     const { user, logout } = useUser();
     const { cart, isCartOpen, setIsCartOpen, toastMessage, hideToast } = useCart();
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [showBackToTop, setShowBackToTop] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const { products } = useStore();
+    const { products, wishlist, serverConnected, setServerConnected } = useStore();
+
+    useEffect(() => {
+      const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+      return () => clearTimeout(timer);
+    }, [searchQuery]);
     const isAdminPage = location.pathname.startsWith('/admin');
 
     useEffect(() => {
@@ -48,17 +55,23 @@ export default function App() {
         }
     }, []);
 
+    useEffect(() => {
+      fetch('http://localhost:3001/api/products')
+        .then(res => { if (res.ok) setServerConnected(true); })
+        .catch(() => { /* server not available */ });
+    }, [setServerConnected]);
+
     const searchResults = useMemo(() => {
-        if (searchQuery.trim() === "") {
+        if (debouncedSearch.trim() === "") {
             return [];
         } else {
             return products.filter(product =>
-                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.category.toLowerCase().includes(searchQuery.toLowerCase())
+                product.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                product.description.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                product.category.toLowerCase().includes(debouncedSearch.toLowerCase())
             );
         }
-    }, [searchQuery, products]);
+    }, [debouncedSearch, products]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -109,6 +122,7 @@ export default function App() {
     }
 
     return (
+        <ErrorBoundary>
         <div className="min-h-screen bg-[#faf6f0] font-sans text-gray-900">
             <header className={`bg-rose-950 text-white border-b-4 border-amber-500 shadow-md ${isAdminPage ? '' : 'sticky top-0 z-40'}`}>
                 <div className="bg-amber-500 text-rose-950 text-xs md:text-sm font-bold text-center py-1.5 px-4 tracking-wide">
@@ -154,6 +168,11 @@ export default function App() {
                                 <>
                                 <Link to="/wishlist" className="flex items-center gap-1 cursor-pointer hover:border-amber-400 border border-transparent p-1 rounded relative transition-colors">
                                     <Heart className="w-7 h-7 text-amber-400" />
+                                    {wishlist.length > 0 && (
+                                        <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                            {wishlist.length}
+                                        </span>
+                                    )}
                                     <span className="hidden sm:block text-sm font-bold mt-3 text-amber-400">Wishlist</span>
                                 </Link>
                                 <button onClick={handleCartClick} className="flex items-center gap-1 cursor-pointer hover:border-amber-400 border border-transparent p-1 rounded relative transition-colors">
@@ -192,6 +211,20 @@ export default function App() {
                 )}
             </header>
 
+            {/* Server Sync Status */}
+            {!isAdminPage && !serverConnected && (
+              <div className="bg-amber-50 border-b-2 border-amber-300 text-amber-800 text-xs font-bold text-center py-2 px-4 tracking-wide flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Sandbox Mode — Backend server not connected. Changes are local only.
+              </div>
+            )}
+            {!isAdminPage && serverConnected && (
+              <div className="bg-green-50 border-b-2 border-green-300 text-green-800 text-xs font-bold text-center py-2 px-4 tracking-wide flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Live Connection — Backend server connected. Data is synced.
+              </div>
+            )}
+
             {/* Centered Search Modal */}
             {isSearchOpen && location.pathname !== '/signin' && location.pathname !== '/signup' && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center px-4">
@@ -219,13 +252,13 @@ export default function App() {
 
                         {/* Search Results */}
                         <div className="flex-1 overflow-y-auto bg-gray-50/50">
-                            {searchQuery.trim() === "" ? (
+                            {debouncedSearch.trim() === "" ? (
                                 <div className="p-12 text-center text-gray-500">
                                     <p className="text-lg">Start typing to search our collection</p>
                                 </div>
                             ) : searchResults.length === 0 ? (
                                 <div className="p-12 text-center text-gray-500">
-                                    <p className="text-lg">No products found matching "{searchQuery}"</p>
+                                    <p className="text-lg">No products found matching "{debouncedSearch}"</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-6">
@@ -304,39 +337,39 @@ export default function App() {
                         <div>
                             <h3 className="font-bold text-white mb-4">Get to Know Us</h3>
                             <ul className="space-y-3">
-                                <li><a href="#" className="hover:underline">About Us</a></li>
-                                <li><a href="#" className="hover:underline">Careers</a></li>
-                                <li><a href="#" className="hover:underline">Press Releases</a></li>
-                                <li><a href="#" className="hover:underline">Pehenavas Science</a></li>
+                                <li><Link to="/" className="hover:underline">About Us</Link></li>
+                                <li><Link to="/" className="hover:underline">Careers</Link></li>
+                                <li><Link to="/" className="hover:underline">Press Releases</Link></li>
+                                <li><Link to="/" className="hover:underline">Pehenavas Science</Link></li>
                             </ul>
                         </div>
                         <div>
                             <h3 className="font-bold text-white mb-4">Connect with Us</h3>
                             <ul className="space-y-3">
-                                <li><a href="#" className="hover:underline">Facebook</a></li>
-                                <li><a href="#" className="hover:underline">Twitter</a></li>
-                                <li><a href="#" className="hover:.underline">Instagram</a></li>
+                                <li><a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Facebook</a></li>
+                                <li><a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Twitter</a></li>
+                                <li><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Instagram</a></li>
                             </ul>
                         </div>
                         <div>
                             <h3 className="font-bold text-white mb-4">Make Money with Us</h3>
                             <ul className="space-y-3">
-                                <li><a href="#" className="hover:underline">Sell on Pehenavas</a></li>
-                                <li><a href="#" className="hover:underline">Sell under Pehenavas Accelerator</a></li>
-                                <li><a href="#" className="hover:underline">Become an Affiliate</a></li>
-                                <li><a href="#" className="hover:underline">Advertise Your Products</a></li>
-                                <li><a href="#" className="hover:underline">Pehenavas Pay on Merchants</a></li>
+                                <li><Link to="/" className="hover:underline">Sell on Pehenavas</Link></li>
+                                <li><Link to="/" className="hover:underline">Sell under Pehenavas Accelerator</Link></li>
+                                <li><Link to="/" className="hover:underline">Become an Affiliate</Link></li>
+                                <li><Link to="/" className="hover:underline">Advertise Your Products</Link></li>
+                                <li><Link to="/" className="hover:underline">Pehenavas Pay on Merchants</Link></li>
                             </ul>
                         </div>
                         <div>
                             <h3 className="font-bold text-white mb-4">Let Us Help You</h3>
                             <ul className="space-y-3">
-                                <li><a href="#" className="hover:underline">COVID-19 and Pehenavas</a></li>
-                                <li><a href="#" className="hover:underline">Your Account</a></li>
-                                <li><a href="#" className="hover:underline">Returns Centre</a></li>
-                                <li><a href="#" className="hover:underline">100% Purchase Protection</a></li>
-                                <li><a href="#" className="hover:underline">Pehenavas App Download</a></li>
-                                <li><a href="#" className="hover:underline">Help</a></li>
+                                <li><Link to="/" className="hover:underline">COVID-19 and Pehenavas</Link></li>
+                                <li><Link to="/account" className="hover:underline">Your Account</Link></li>
+                                <li><Link to="/" className="hover:underline">Returns Centre</Link></li>
+                                <li><Link to="/" className="hover:underline">100% Purchase Protection</Link></li>
+                                <li><Link to="/" className="hover:underline">Pehenavas App Download</Link></li>
+                                <li><Link to="/" className="hover:underline">Help</Link></li>
                                 <li><Link to="/admin/login" className="hover:underline text-amber-400 font-semibold">Admin Portal</Link></li>
                             </ul>
                         </div>
@@ -362,5 +395,6 @@ export default function App() {
                 </button>
             )}
         </div>
+        </ErrorBoundary>
     );
 }

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { showAlert } from '../utils/alert';
+import { adminApi } from '../services/api';
 
 const mockOrders = [
   {id: '#ORD-7352', name: 'Priya Sharma', item: 'Royal Silk Sherwani', status: 'Pending Packaging', color: 'bg-amber-100 text-amber-800 border-amber-200', amount: '₹12,499'},
@@ -21,7 +22,7 @@ const mockCustomers = [
 ];
 
 export default function AdminDashboard() {
-  const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct } = useStore();
+  const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct, serverConnected, setServerConnected } = useStore();
   const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -32,6 +33,23 @@ export default function AdminDashboard() {
   const [imagePreview, setImagePreview] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
+  const [syncing, setSyncing] = useState(false);
+
+  const syncWithServer = useCallback(async () => {
+    const serverProducts = await adminApi.getProducts();
+    return serverProducts;
+  }, []);
+
+  useEffect(() => {
+    syncWithServer()
+      .then((serverProducts) => {
+        useStore.getState().syncProducts(serverProducts);
+        setServerConnected(true);
+      })
+      .catch(() => {
+        setServerConnected(false);
+      });
+  }, [syncWithServer, setServerConnected]);
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -75,7 +93,7 @@ export default function AdminDashboard() {
     navigate('/admin/login');
   };
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     const price = Number(data.price);
     const stock = Number(data.stock);
 
@@ -93,6 +111,12 @@ export default function AdminDashboard() {
     }
 
     addProduct({ ...data, price, stock, image: imagePreview });
+
+    try {
+      await adminApi.addProduct({ name: data.name, price });
+    } catch {
+      // Server sync is best-effort
+    }
 
     reset();
     setImagePreview('');
@@ -146,9 +170,10 @@ export default function AdminDashboard() {
                 <label className="block text-sm font-bold text-rose-950 mb-1">Category</label>
                 <select required {...register('category', { required: true })} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300">
                   <option value="" disabled>Select Category</option>
-                  <option value="Topwear">Topwear</option>
-                  <option value="Bottomwear">Bottomwear</option>
-                  <option value="Outerwear">Outerwear</option>
+                  <option value="Women">Women</option>
+                  <option value="Men">Men</option>
+                  <option value="Jewellery">Jewellery</option>
+                  <option value="Footwear">Footwear</option>
                   <option value="Accessories">Accessories</option>
                 </select>
               </div>
@@ -203,6 +228,19 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-8">
+        {/* Sync Status Banner */}
+        {!serverConnected && (
+          <div className="mb-6 bg-amber-50 border-2 border-amber-300 text-amber-800 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span>Sandbox Mode — Backend server not connected. Changes are local only.</span>
+          </div>
+        )}
+        {serverConnected && (
+          <div className="mb-6 bg-green-50 border-2 border-green-300 text-green-800 px-5 py-3 rounded-xl flex items-center gap-3 text-sm font-bold shadow-sm">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
+            <span>Live Connection — Backend server connected. Data is synced.</span>
+          </div>
+        )}
         <header className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-rose-950 font-serif capitalize">{activeSection}</h2>
           <div className="flex space-x-4">
@@ -218,6 +256,23 @@ export default function AdminDashboard() {
                 readOnly
               />
             </button>
+<button onClick={async () => {
+               setSyncing(true);
+               await syncWithServer()
+                 .then((serverProducts) => {
+                   useStore.getState().syncProducts(serverProducts);
+                   setServerConnected(true);
+                   showAlert('Products synced with server.', 'success');
+                 })
+                 .catch(() => {
+                   setServerConnected(false);
+                   showAlert('Could not connect to server. Using local data.', 'warning');
+                 })
+                 .finally(() => setSyncing(false));
+             }} disabled={syncing} className="flex items-center space-x-2 bg-rose-100 text-rose-950 px-4 py-2.5 rounded-full hover:bg-rose-200 transition shadow-sm font-bold text-sm">
+               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+               <span>{syncing ? 'Syncing...' : 'Sync'}</span>
+             </button>
             <button onClick={() => setShowAddModal(true)} className="flex items-center space-x-2 bg-amber-500 text-rose-950 px-6 py-2.5 rounded-full hover:bg-amber-400 transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-bold uppercase tracking-wide text-sm">
               <Plus className="w-4 h-4" />
               <span>Add Product</span>
@@ -382,7 +437,7 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-              <button className="w-full mt-4 py-3 text-xs font-bold text-rose-900 bg-rose-50 rounded-xl hover:bg-rose-100 hover:text-rose-950 transition-colors uppercase tracking-widest shadow-sm">View Full Catalog</button>
+              <button onClick={() => setActiveSection('products')} className="w-full mt-4 py-3 text-xs font-bold text-rose-900 bg-rose-50 rounded-xl hover:bg-rose-100 hover:text-rose-950 transition-colors uppercase tracking-widest shadow-sm">View Full Catalog</button>
             </div>
           </div>
         )}
@@ -413,8 +468,13 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-end mt-3">
                        <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
                        <div className="flex space-x-1">
-                         <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
-                         <button onClick={() => removeProduct(product.id)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                          <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={async () => {
+                            removeProduct(product.id);
+                            try {
+                              await adminApi.removeProduct(product.id);
+                            } catch { /* ignore */ }
+                          }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>
                     <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
@@ -509,8 +569,13 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-end mt-3">
                        <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
                        <div className="flex space-x-1">
-                         <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
-                         <button onClick={() => removeProduct(product.id)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                          <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={async () => {
+                            removeProduct(product.id);
+                            try {
+                              await adminApi.removeProduct(product.id);
+                            } catch { /* ignore */ }
+                          }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>
                     <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
