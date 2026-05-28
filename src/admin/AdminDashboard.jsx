@@ -36,23 +36,20 @@ export default function AdminDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   const syncWithServer = useCallback(async () => {
-    setSyncing(true);
-    try {
-      const serverProducts = await adminApi.getProducts();
-      useStore.getState().syncProducts(serverProducts);
-      setServerConnected(true);
-      showAlert('Products synced with server.', 'success');
-    } catch {
-      setServerConnected(false);
-      showAlert('Could not connect to server. Using local data.', 'warning');
-    } finally {
-      setSyncing(false);
-    }
-  }, [setServerConnected]);
+    const serverProducts = await adminApi.getProducts();
+    return serverProducts;
+  }, []);
 
   useEffect(() => {
-    syncWithServer();
-  }, [syncWithServer]);
+    syncWithServer()
+      .then((serverProducts) => {
+        useStore.getState().syncProducts(serverProducts);
+        setServerConnected(true);
+      })
+      .catch(() => {
+        setServerConnected(false);
+      });
+  }, [syncWithServer, setServerConnected]);
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -259,10 +256,23 @@ export default function AdminDashboard() {
                 readOnly
               />
             </button>
-            <button onClick={syncWithServer} disabled={syncing} className="flex items-center space-x-2 bg-rose-100 text-rose-950 px-4 py-2.5 rounded-full hover:bg-rose-200 transition shadow-sm font-bold text-sm">
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : 'Sync'}</span>
-            </button>
+<button onClick={async () => {
+               setSyncing(true);
+               await syncWithServer()
+                 .then((serverProducts) => {
+                   useStore.getState().syncProducts(serverProducts);
+                   setServerConnected(true);
+                   showAlert('Products synced with server.', 'success');
+                 })
+                 .catch(() => {
+                   setServerConnected(false);
+                   showAlert('Could not connect to server. Using local data.', 'warning');
+                 })
+                 .finally(() => setSyncing(false));
+             }} disabled={syncing} className="flex items-center space-x-2 bg-rose-100 text-rose-950 px-4 py-2.5 rounded-full hover:bg-rose-200 transition shadow-sm font-bold text-sm">
+               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+               <span>{syncing ? 'Syncing...' : 'Sync'}</span>
+             </button>
             <button onClick={() => setShowAddModal(true)} className="flex items-center space-x-2 bg-amber-500 text-rose-950 px-6 py-2.5 rounded-full hover:bg-amber-400 transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-bold uppercase tracking-wide text-sm">
               <Plus className="w-4 h-4" />
               <span>Add Product</span>
@@ -463,7 +473,7 @@ export default function AdminDashboard() {
                             removeProduct(product.id);
                             try {
                               await adminApi.removeProduct(product.id);
-                            } catch {}
+                            } catch { /* ignore */ }
                           }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>
@@ -564,7 +574,7 @@ export default function AdminDashboard() {
                             removeProduct(product.id);
                             try {
                               await adminApi.removeProduct(product.id);
-                            } catch {}
+                            } catch { /* ignore */ }
                           }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>

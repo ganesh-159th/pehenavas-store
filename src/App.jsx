@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useMemo } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
