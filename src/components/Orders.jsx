@@ -1,19 +1,50 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { formatINR } from '../utils';
 import { useFadeIn } from '../hooks/useFadeIn';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Loader2 } from 'lucide-react';
+import { adminApi } from '../services/api';
 
 const Orders = () => {
   const isVisible = useFadeIn();
-  const orders = useStore((state) => state.orders);
+  const localOrders = useStore((state) => state.orders);
+  const [serverOrders, setServerOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const orders = await adminApi.getOrders();
+      if (orders && orders.length > 0) {
+        setServerOrders(orders);
+      }
+    } catch {
+      // No server orders — using local
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadOrders();
+  }, [loadOrders]);
+
+  const allOrders = serverOrders.length > 0 ? serverOrders : localOrders;
 
   return (
     <div className={`bg-white rounded-xl shadow-md border border-rose-100 overflow-hidden min-h-[400px] transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
-      <div className="p-4 border-b border-rose-100 bg-rose-50/50">
-        <h2 className="mx-auto text-2xl font-serif font-bold text-rose-950">Your Orders</h2>
+      <div className="p-4 border-b border-rose-100 bg-rose-50/50 flex justify-between items-center">
+        <h2 className="text-2xl font-serif font-bold text-rose-950">Your Orders</h2>
+        {serverOrders.length > 0 && (
+          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-bold">Synced</span>
+        )}
       </div>
-      {orders.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-rose-950" />
+        </div>
+      ) : allOrders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-4">
           <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mb-6">
             <ShoppingBag className="w-12 h-12 text-rose-300" />
@@ -23,7 +54,7 @@ const Orders = () => {
         </div>
       ) : (
         <div className="p-6 lg:p-10 flex flex-col gap-6">
-          {orders.map((order) => (
+          {allOrders.map((order) => (
             <div key={order.id} className="border rounded-lg p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -38,7 +69,7 @@ const Orders = () => {
                 </div>
               </div>
               <div className="flex flex-col gap-4">
-                {order.items.map((item) => (
+                {order.items?.map((item) => (
                   <div key={`${item.id}-${item.size}`} className="flex items-center gap-4">
                     <img src={item.image} alt={item.name} className="w-20 h-24 object-cover rounded-md" />
                     <div>
@@ -48,6 +79,14 @@ const Orders = () => {
                   </div>
                 ))}
               </div>
+              {order.address && (
+                <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
+                  <p className="font-medium text-gray-700">Shipping to: {order.address.fullName}</p>
+                  <p>{order.address.line1}{order.address.line2 ? `, ${order.address.line2}` : ''}</p>
+                  <p>{order.address.city}, {order.address.state} - {order.address.pincode}</p>
+                  <p>Phone: {order.address.phone}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>

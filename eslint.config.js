@@ -27,6 +27,12 @@ export default defineConfig([
     },
   },
   {
+    files: ['server.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  {
     // Let ESLint know about Cypress and Mocha globally injected variables
     files: ['cypress/**/*.js', 'cypress/**/*.jsx', 'cypress.config.js'],
     languageOptions: {

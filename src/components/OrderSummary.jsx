@@ -3,7 +3,7 @@ import { CheckCircle2, Sparkles, Package, Truck } from 'lucide-react';
 import { formatINR } from '../utils';
 import { useFadeIn } from '../hooks/useFadeIn';
 
-const OrderSummary = ({ cart, cartTotal, orderDetails, address, onBackToShopping }) => {
+const OrderSummary = ({ cart, cartTotal, orderDetails, address, paymentMethod, onBackToShopping }) => {
     const isVisible = useFadeIn();
 
     return (
@@ -33,7 +33,7 @@ const OrderSummary = ({ cart, cartTotal, orderDetails, address, onBackToShopping
             </div>
             <div>
                 <p className="text-xs text-rose-500 uppercase tracking-wider font-bold mb-1">Payment Method</p>
-                <p className="font-bold text-rose-950">Prepaid</p>
+                <p className="font-bold text-rose-950 capitalize">{paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod === 'upi' ? 'UPI' : paymentMethod === 'card' ? 'Card' : 'Prepaid'}</p>
             </div>
         </div>
 

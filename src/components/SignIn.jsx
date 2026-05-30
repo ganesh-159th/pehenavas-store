@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../hooks/useUser';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
+import { auth } from '../services/firebase';
 
 const RoyalLotus = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -26,6 +27,15 @@ const SignIn = () => {
   const [submitting, setSubmitting] = useState(false);
   const isVisible = useFadeIn();
 
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaResolver, setMfaResolver] = useState(null);
+  const [mfaPhone, setMfaPhone] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaVerificationId, setMfaVerificationId] = useState(null);
+  const [mfaSending, setMfaSending] = useState(false);
+  const [mfaVerifying, setMfaVerifying] = useState(false);
+  const [mfaError, setMfaError] = useState('');
+
   useEffect(() => {
     if (location.state?.message) {
       showAlert(location.state.message, 'warning');
@@ -47,6 +57,42 @@ const SignIn = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const sendMfaCode = async () => {
+    setMfaSending(true);
+    setMfaError('');
+    try {
+      const { sendMfaChallengeCode } = await import('../services/auth');
+      const result = await sendMfaChallengeCode(mfaResolver);
+      setMfaPhone(result.phoneNumber);
+      setMfaVerificationId(result.verificationId);
+      showAlert('MFA code sent to your phone!', 'success');
+    } catch (err) {
+      setMfaError(err.message || 'Failed to send code');
+    } finally {
+      setMfaSending(false);
+    }
+  };
+
+  const verifyMfaCode = async () => {
+    if (!mfaCode || mfaCode.length < 6) {
+      setMfaError('Enter the 6-digit code');
+      return;
+    }
+    setMfaVerifying(true);
+    setMfaError('');
+    try {
+      const { verifyMfaChallengeCode } = await import('../services/auth');
+      await verifyMfaChallengeCode(mfaCode);
+      showAlert('Signed in successfully!', 'success');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      setMfaError(err.message || 'Invalid code');
+    } finally {
+      setMfaVerifying(false);
+    }
+  };
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     if (!validate()) {
@@ -60,19 +106,85 @@ const SignIn = () => {
       const from = location.state?.from || '/';
       navigate(from, { replace: true });
     } catch (err) {
-      const msg =
-        err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
-          ? 'Invalid email or password.'
-          : err.code === 'auth/invalid-email'
-          ? 'Please enter a valid email address.'
-          : err.code === 'auth/too-many-requests'
-          ? 'Too many attempts. Please try again later.'
-          : 'Failed to sign in. Please try again.';
-      showAlert(msg, 'danger');
+      if (err.code === 'auth/multi-factor-auth-required') {
+        try {
+          const { getMultiFactorResolver, PhoneAuthProvider, PhoneMultiFactorGenerator, RecaptchaVerifier } = await import('firebase/auth');
+          const resolver = getMultiFactorResolver(auth, err);
+          setMfaResolver(resolver);
+          setMfaRequired(true);
+          setMfaPhone(resolver.hints[0]?.phoneNumber || 'your phone');
+        } catch {
+          showAlert('MFA error. Try again.', 'danger');
+        }
+      } else {
+        const msg =
+          err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+            ? 'Invalid email or password.'
+            : err.code === 'auth/invalid-email'
+            ? 'Please enter a valid email address.'
+            : err.code === 'auth/too-many-requests'
+            ? 'Too many attempts. Please try again later.'
+            : 'Failed to sign in. Please try again.';
+        showAlert(msg, 'danger');
+      }
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (mfaRequired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#faf6f0] to-amber-50 flex items-center justify-center px-4 py-12">
+        <div id="mfa-recaptcha"></div>
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-amber-100">
+            <div className="h-1 bg-gradient-to-r from-rose-950 via-amber-500 to-rose-950"></div>
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShieldCheck className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold text-rose-950 mb-2">Two-Factor Auth Required</h2>
+              <p className="text-gray-600 text-sm mb-6">Enter the code sent to {mfaPhone}</p>
+
+              {!mfaVerificationId ? (
+                <button
+                  onClick={sendMfaCode}
+                  disabled={mfaSending}
+                  className="w-full py-2.5 bg-gradient-to-r from-rose-950 to-rose-900 text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-60"
+                >
+                  {mfaSending ? 'Sending code...' : 'Send Verification Code'}
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={mfaCode}
+                    onChange={(e) => { setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setMfaError(''); }}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="w-full text-center text-2xl tracking-[0.5em] px-4 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none border-gray-200"
+                  />
+                  {mfaError && (
+                    <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-rose-800 text-xs">{mfaError}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={verifyMfaCode}
+                    disabled={mfaVerifying || mfaCode.length < 6}
+                    className="w-full py-2.5 bg-gradient-to-r from-rose-950 to-rose-900 text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-60"
+                  >
+                    {mfaVerifying ? 'Verifying...' : 'Verify & Sign In'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#faf6f0] to-amber-50 flex items-center justify-center px-4 py-12 overflow-hidden">
@@ -83,9 +195,7 @@ const SignIn = () => {
               <RoyalLotus className="w-8 h-8 text-amber-400" />
             </div>
             <div className="flex flex-col text-left">
-              <h1 className="text-2xl font-bold tracking-widest font-serif text-rose-950 leading-none">
-                PEHENAVAS
-              </h1>
+              <h1 className="text-2xl font-bold tracking-widest font-serif text-rose-950 leading-none">PEHENAVAS</h1>
               <span className="text-xs text-amber-600 tracking-[0.2em] font-sans uppercase opacity-90">The Royal Heritage</span>
             </div>
           </Link>
@@ -99,13 +209,9 @@ const SignIn = () => {
             <form className="space-y-5" onSubmit={handleSignIn}>
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">Email address</label>
-                <input
-                  id="email" name="email" type="email" autoComplete="email"
+                <input id="email" name="email" type="email" autoComplete="email"
                   className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-500 transition-all outline-none ${errors.email ? 'border-rose-500 bg-rose-50' : 'border-gray-200'}`}
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors({ ...errors, email: null }); }}
-                  placeholder="you@example.com"
-                />
+                  value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors({ ...errors, email: null }); }} placeholder="you@example.com" />
                 {errors.email && (
                   <div className="flex items-start gap-2 mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-md shadow-sm">
                     <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
@@ -117,13 +223,9 @@ const SignIn = () => {
               <div>
                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
                 <div className="relative">
-                  <input
-                    id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password"
+                  <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password"
                     className={`w-full px-4 py-2.5 pr-12 border-2 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-500 transition-all outline-none ${errors.password ? 'border-rose-500 bg-rose-50' : 'border-gray-200'}`}
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); if (errors.password) setErrors({ ...errors, password: null }); }}
-                    placeholder="••••••••"
-                  />
+                    value={password} onChange={(e) => { setPassword(e.target.value); if (errors.password) setErrors({ ...errors, password: null }); }} placeholder="••••••••" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-500 focus:outline-none transition-colors">
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -136,10 +238,8 @@ const SignIn = () => {
                 )}
               </div>
 
-              <button
-                type="submit" disabled={submitting}
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-950 to-rose-900 text-white font-semibold rounded-lg hover:shadow-lg hover:from-rose-900 hover:to-rose-800 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-60"
-              >
+              <button type="submit" disabled={submitting}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-950 to-rose-900 text-white font-semibold rounded-lg hover:shadow-lg hover:from-rose-900 hover:to-rose-800 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-60">
                 {submitting ? 'Signing in...' : 'Sign In'}
               </button>
             </form>

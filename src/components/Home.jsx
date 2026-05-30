@@ -1,4 +1,4 @@
-import React, { useMemo, useReducer, useEffect } from 'react';
+import React, { useMemo, useReducer, useEffect, useRef } from 'react';
 import { ShoppingCart, Star, X, ChevronRight, ChevronLeft, Filter } from 'lucide-react';
 import { CATEGORIES } from '../data/categories.js';
 import { BANNERS } from '../data/banners.js';
@@ -58,13 +58,15 @@ const Home = ({ searchResults, searchQuery }) => {
     const isVisible = useFadeIn();
 
     // Auto-slide effect for banner
+    const bannerRef = useRef(currentBanner);
+    useEffect(() => { bannerRef.current = currentBanner; });
     useEffect(() => {
         if (quickViewProduct) return; // Pause carousel if looking at a product
         const timer = setInterval(() => {
-            dispatch({ type: 'SET_CURRENT_BANNER', payload: (currentBanner + 1) % BANNERS.length });
+            dispatch({ type: 'SET_CURRENT_BANNER', payload: (bannerRef.current + 1) % BANNERS.length });
         }, 5000);
         return () => clearInterval(timer);
-    }, [quickViewProduct, currentBanner]);
+    }, [quickViewProduct]);
 
     const nextBanner = () => dispatch({ type: 'SET_CURRENT_BANNER', payload: (currentBanner + 1) % BANNERS.length });
     const prevBanner = () => dispatch({ type: 'SET_CURRENT_BANNER', payload: (currentBanner - 1 + BANNERS.length) % BANNERS.length });

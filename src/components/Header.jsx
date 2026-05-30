@@ -1,13 +1,10 @@
 import React from 'react';
 import { useUser } from '../hooks/useUser';
+import { useNavigate } from 'react-router-dom';
 
 const Header = () => {
-  const { user, login } = useUser();
-
-  const handleSignIn = () => {
-    // This is a mock login. Replace with a real authentication flow.
-    login({ name: 'Ganesh' });
-  };
+  const { user } = useUser();
+  const navigate = useNavigate();
 
   return (
     <header className="bg-gray-800 text-white p-4 flex justify-between items-center">
@@ -16,7 +13,7 @@ const Header = () => {
         {user ? (
           <div className="mr-4">Hello, {user.name}</div>
         ) : (
-          <button onClick={handleSignIn} className="mr-4">
+          <button onClick={() => navigate('/signin')} className="mr-4">
             Sign In
           </button>
         )}

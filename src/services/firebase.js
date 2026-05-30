@@ -12,6 +12,13 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+const missing = Object.entries(firebaseConfig)
+  .filter(([, v]) => !v)
+  .map(([k]) => k.replace(/^VITE_FIREBASE_/, ''));
+if (missing.length > 0) {
+  throw new Error(`Missing Firebase config: ${missing.join(', ')}. Check your .env file.`);
+}
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);

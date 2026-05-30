@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Star, ArrowLeft } from 'lucide-react';
-import { PRODUCTS } from '../data/products.js';
 import { formatINR } from '../utils.js';
 import { useCart } from '../hooks/useCart';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { useStore } from '../store/useStore';
 
 const ProductDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const isVisible = useFadeIn();
     const { addToCart } = useCart();
+    const products = useStore((state) => state.products);
     const [selectedSize, setSelectedSize] = useState('M');
     const [selectedColor, setSelectedColor] = useState(null);
 
-    // Find the product, ensuring we convert both IDs to strings for a safe match
-    const product = PRODUCTS.find(p => String(p.id) === String(id));
+    const product = products.find(p => String(p.id) === String(id));
 
     // Dynamically update the document title for SEO and UX
     useEffect(() => {

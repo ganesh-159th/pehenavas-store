@@ -10,32 +10,40 @@ export const useStore = create(
       wishlist: [],
       orders: [],
       isCartOpen: false,
-      isAdminAuthenticated: false,
       toastMessage: null,
 
       // Initialize store with real storefront products
       products: PRODUCTS,
 
-      addProduct: (product) => set((state) => ({
-        products: [{
-          ...product,
-          id: Date.now().toString(),
-          rating: product.rating ?? 0,
-          reviews: product.reviews ?? 0,
-          originalPrice: product.originalPrice ?? product.price,
-          colors: product.colors ?? [],
-          description: product.description ?? '',
-        }, ...state.products]
-      })),
+      addProduct: (product) => {
+        const { imageFile: _img, ...cleanProduct } = product;
+        set((state) => ({
+          products: [{
+            ...cleanProduct,
+            id: cleanProduct.id || Date.now().toString(),
+            rating: cleanProduct.rating ?? 0,
+            reviews: cleanProduct.reviews ?? 0,
+            originalPrice: cleanProduct.originalPrice ?? cleanProduct.price,
+            colors: cleanProduct.colors ?? [],
+            description: cleanProduct.description ?? '',
+          }, ...state.products]
+        }));
+      },
 
       removeProduct: (id) => {
-        set((state) => {
-          const product = state.products.find(p => p.id === id);
-          if (product) {
-            setTimeout(() => showAlert(`"${product.name}" removed from catalog.`, 'danger'), 0);
-          }
-          return { products: state.products.filter(p => p.id !== id) };
-        });
+        const state = useStore.getState();
+        const product = state.products.find(p => p.id === id);
+        if (product) {
+          setTimeout(() => showAlert(`"${product.name}" removed from catalog.`, 'danger'), 0);
+        }
+        set({ products: state.products.filter(p => p.id !== id) });
+      },
+
+      updateProduct: (id, data) => {
+        const { imageFile: _img, ...cleanData } = data;
+        set((state) => ({
+          products: state.products.map(p => p.id === id ? { ...p, ...cleanData } : p),
+        }));
       },
 
       syncProducts: (serverProducts) => set((state) => {
@@ -97,9 +105,11 @@ export const useStore = create(
           }));
           return;
         }
+        const MAX_QTY = 99;
+        const clamped = Math.min(qty, MAX_QTY);
         set((state) => ({
           cart: state.cart.map(item =>
-            item.id === id && item.size === size ? { ...item, qty } : item
+            item.id === id && item.size === size ? { ...item, qty: clamped } : item
           ),
         }));
       },
@@ -127,15 +137,7 @@ export const useStore = create(
       serverConnected: false,
       setServerConnected: (connected) => set({ serverConnected: connected }),
 
-      // Admin Auth
-      adminLogin: (username, password) => {
-        if (username === 'admin' && password === 'admin123') {
-          set({ isAdminAuthenticated: true });
-          return true;
-        }
-        return false;
-      },
-      adminLogout: () => set({ isAdminAuthenticated: false }),
+
 
       // Wishlist Actions
       toggleWishlist: (product) => {
@@ -148,17 +150,23 @@ export const useStore = create(
     }),
     {
       name: 'pehenavas-storage',
-      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, orders: state.orders, isAdminAuthenticated: state.isAdminAuthenticated }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...persisted,
-        products: [
-          ...(persisted.products || []).filter(
-            p => typeof p.id === 'string' && !current.products.find(cp => String(cp.id) === String(p.id))
-          ),
-          ...current.products,
-        ],
-      }),
+      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, orders: state.orders }),
+      merge: (persisted, current) => {
+        const cleanPersisted = (persisted.products || []).map(p => {
+          const { imageFile: _img, ...clean } = p;
+          return clean;
+        });
+        return {
+          ...current,
+          ...persisted,
+          products: [
+            ...cleanPersisted.filter(
+              p => typeof p.id === 'string' && !current.products.find(cp => String(cp.id) === String(p.id))
+            ),
+            ...current.products,
+          ],
+        };
+      },
     }
   )
 );

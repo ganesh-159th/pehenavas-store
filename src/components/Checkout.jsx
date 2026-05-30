@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useCart } from '../hooks/useCart';
 import { formatINR } from '../utils.js';
-import { CreditCard, Smartphone, Banknote, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Smartphone, Banknote, ArrowLeft, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import OrderSummary from './OrderSummary.jsx';
 import { useUser } from '../hooks/useUser';
 import { Navigate, Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
 import { useStore } from '../store/useStore';
+import { adminApi } from '../services/api';
+
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
@@ -51,11 +54,18 @@ const Checkout = () => {
     };
 
     const handleCardExpiryChange = (e) => {
-        let val = e.target.value.replace(/\D/g, '');
+        const raw = e.target.value;
+        const val = raw.replace(/\D/g, '');
+        if (val.length > 4) return;
+        let formatted = val;
         if (val.length >= 2) {
-            val = val.substring(0, 2) + '/' + val.substring(2, 4);
+            if (raw.length > raw.replace(/\D/g, '').length || raw.endsWith('/')) {
+                formatted = val.substring(0, 2) + '/' + val.substring(2, 4);
+            } else {
+                formatted = val.substring(0, 2) + '/' + val.substring(2, 4);
+            }
         }
-        setCardExpiry(val);
+        setCardExpiry(formatted);
         if (errors.cardExpiry) setErrors({ ...errors, cardExpiry: null });
     };
 
@@ -65,9 +75,7 @@ const Checkout = () => {
         if (errors.cardCvv) setErrors({ ...errors, cardCvv: null });
     };
 
-    const handlePlaceOrder = () => {
-        if (cart.length === 0) return;
-
+    const validateForm = () => {
         const newErrors = {};
         if (!address.fullName.trim()) newErrors.fullName = 'Full name is required.';
         if (!address.phone.trim() || !/^\d{10}$/.test(address.phone)) newErrors.phone = 'Valid 10-digit phone is required.';
@@ -89,43 +97,134 @@ const Checkout = () => {
                 newErrors.cardCvv = "Please enter a valid CVV.";
             }
         }
+        return newErrors;
+    };
 
+    const completeOrder = async (paymentId = null) => {
+        setOrderPlaced(true);
+        const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
+        const today = new Date();
+        const deliveryDate = new Date(today);
+        deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
+        const formattedDate = today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+        const formattedDelivery = deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
+
+        const order = {
+            id: orderId,
+            userId: user?.uid || 'guest',
+            userEmail: user?.email || '',
+            date: formattedDate,
+            delivery: formattedDelivery,
+            items: [...cart],
+            total: cartTotal,
+            status: 'Confirmed',
+            address: { ...address },
+            paymentMethod,
+            paymentId,
+        };
+
+        addOrder(order);
+
+        try {
+            await adminApi.addOrder(order);
+        } catch {
+            // Server save best-effort
+        }
+
+        try {
+            if (user?.email) {
+                await adminApi.sendOrderConfirmation({
+                    to: user.email,
+                    orderId,
+                    total: cartTotal,
+                    items: cart,
+                    name: address.fullName,
+                });
+            }
+        } catch {
+            // Email send best-effort
+        }
+
+        setFinalOrder({
+            cart: [...cart],
+            cartTotal,
+            details: { id: orderId, date: formattedDate, delivery: formattedDelivery },
+            address: { ...address },
+        });
+        setShowOrderSummary(true);
+        clearCart();
+        showAlert('Order placed successfully! 🎉', 'success');
+    };
+
+    const handleRazorpayPayment = async () => {
+        try {
+            const order = await adminApi.createPaymentOrder(cartTotal);
+            if (!order || !order.id) throw new Error('Could not create payment order');
+
+            const options = {
+                key: RAZORPAY_KEY_ID,
+                amount: order.amount,
+                currency: order.currency,
+                name: 'Pehenavas Store',
+                description: `Order for ${address.fullName}`,
+                order_id: order.id,
+                prefill: {
+                    name: address.fullName,
+                    email: user?.email || '',
+                    contact: address.phone,
+                },
+                theme: { color: '#1a0a0a' },
+                handler: async (response) => {
+                    await adminApi.verifyPayment(response);
+                    await completeOrder(response.razorpay_payment_id);
+                },
+                modal: {
+                    ondismiss: () => {
+                        setOrderPlaced(false);
+                        showAlert('Payment cancelled.', 'warning');
+                    },
+                },
+            };
+
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+        } catch {
+            completeOrder(null);
+        }
+    };
+
+    const handlePlaceOrder = async () => {
+        if (cart.length === 0 || orderPlaced) return;
+
+        const newErrors = validateForm();
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             showAlert('Please fill in all required fields correctly.', 'warning');
             return;
         }
 
-        setOrderPlaced(true);
-        setTimeout(() => {
-            const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
-            const today = new Date();
-            const deliveryDate = new Date(today);
-            deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
-            const order = { 
-                id: orderId,
-                date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
-                delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }),
-                items: [...cart],
-                total: cartTotal,
-                status: 'Confirmed',
-                address: { ...address }
-            };
-            addOrder(order);
-            setFinalOrder({ 
-                cart: [...cart], 
-                cartTotal,
-                details: {
-                    id: orderId,
-                    date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
-                    delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })
-                },
-                address: { ...address }
-            });
-            setShowOrderSummary(true);
-            clearCart();
-            showAlert('Order placed successfully! 🎉', 'success');
-        }, 1000);
+        if (paymentMethod === 'cod') {
+            completeOrder(null);
+            return;
+        }
+
+        if (paymentMethod === 'upi') {
+            if (RAZORPAY_KEY_ID && typeof window.Razorpay !== 'undefined') {
+                handleRazorpayPayment();
+            } else {
+                setOrderPlaced(true);
+                setTimeout(() => completeOrder(null), 1000);
+            }
+            return;
+        }
+
+        if (paymentMethod === 'card') {
+            setOrderPlaced(true);
+            setTimeout(() => completeOrder(null), 1000);
+            return;
+        }
+
+        completeOrder(null);
     };
 
     const handleBackToShopping = () => {
@@ -152,7 +251,7 @@ const Checkout = () => {
     }
 
     if (showOrderSummary && finalOrder) {
-        return <OrderSummary cart={finalOrder.cart} cartTotal={finalOrder.cartTotal} orderDetails={finalOrder.details} address={finalOrder.address} onBackToShopping={handleBackToShopping} />;
+        return <OrderSummary cart={finalOrder.cart} cartTotal={finalOrder.cartTotal} orderDetails={finalOrder.details} address={finalOrder.address} paymentMethod={paymentMethod} onBackToShopping={handleBackToShopping} />;
     }
 
     return (

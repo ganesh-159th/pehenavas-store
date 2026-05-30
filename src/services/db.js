@@ -2,8 +2,7 @@ import {
   collection, doc, getDocs, addDoc, deleteDoc, updateDoc,
   query, orderBy, serverTimestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 
 const PRODUCTS_COLLECTION = 'products';
 const ORDERS_COLLECTION = 'orders';
@@ -48,8 +47,4 @@ export const ordersService = {
   },
 };
 
-export async function uploadImage(file, path) {
-  const storageRef = ref(storage, path);
-  const snapshot = await uploadBytes(storageRef, file);
-  return getDownloadURL(snapshot.ref);
-}
+

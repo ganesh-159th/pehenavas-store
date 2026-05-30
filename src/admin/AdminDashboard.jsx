@@ -1,17 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, RefreshCw, CheckCircle2, Truck, PackageCheck, Ban, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useUser } from '../hooks/useUser';
 import { showAlert } from '../utils/alert';
 import { adminApi } from '../services/api';
+import { formatINR } from '../utils';
 
-const mockOrders = [
-  {id: '#ORD-7352', name: 'Priya Sharma', item: 'Royal Silk Sherwani', status: 'Pending Packaging', color: 'bg-amber-100 text-amber-800 border-amber-200', amount: '₹12,499'},
-  {id: '#ORD-7351', name: 'Rahul Verma', item: 'Classic White Kurta', status: 'Shipped', color: 'bg-blue-100 text-blue-800 border-blue-200', amount: '₹2,999'},
-  {id: '#ORD-7350', name: 'Anjali Gupta', item: 'Velvet Bandhgala', status: 'Delivered', color: 'bg-green-100 text-green-800 border-green-200', amount: '₹8,999'},
-  {id: '#ORD-7349', name: 'Karan Singh', item: 'Embroidered Lehenga', status: 'Returned', color: 'bg-red-100 text-red-800 border-red-200', amount: '₹14,999'}
-];
+
+const STATUS_OPTIONS = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+
+const STATUS_STYLES = {
+  'Pending': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Processing': 'bg-blue-100 text-blue-800 border-blue-200',
+  'Shipped': 'bg-purple-100 text-purple-800 border-purple-200',
+  'Delivered': 'bg-green-100 text-green-800 border-green-200',
+  'Cancelled': 'bg-red-100 text-red-800 border-red-200',
+};
 
 const mockCustomers = [
   {name: 'Priya Sharma', email: 'priya.sharma@email.com', orders: 12, spent: '₹1,24,999', status: 'Gold', color: 'bg-amber-100 text-amber-800 border-amber-200'},
@@ -22,10 +28,16 @@ const mockCustomers = [
 ];
 
 export default function AdminDashboard() {
-  const { isAdminAuthenticated, adminLogout, products, addProduct, removeProduct } = useStore();
+  const { products, addProduct, removeProduct, updateProduct } = useStore();
+  const { isAdminUser, logout: userLogout } = useUser();
   const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [serverOrders, setServerOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const { register, handleSubmit, reset } = useForm({
     defaultValues: { name: '', price: '', stock: '', category: '', imageFile: '' }
@@ -48,11 +60,28 @@ export default function AdminDashboard() {
       .catch(() => {});
   }, [syncWithServer]);
 
-  const handleImageChange = (e) => {
+  const loadOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    try {
+      const orders = await adminApi.getOrders();
+      setServerOrders(orders);
+    } catch {
+      // Server orders not available — using local orders
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'orders' || activeSection === 'overview') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadOrders();
+    }
+  }, [activeSection, loadOrders]);
+
+  const handleImageChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
-      }
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
       setImagePreview(URL.createObjectURL(e.target.files[0]));
     }
   };
@@ -67,12 +96,11 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (!isAdminAuthenticated) {
-      navigate('/admin/login');
+    if (!isAdminUser) {
+      navigate('/admin/login', { replace: true });
     }
-  }, [isAdminAuthenticated, navigate]);
+  }, [isAdminUser, navigate]);
 
-  // Close search modal on escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -85,8 +113,8 @@ export default function AdminDashboard() {
     }
   }, [isSearchOpen]);
 
-  const handleLogout = () => {
-    adminLogout();
+  const handleLogout = async () => {
+    await userLogout();
     navigate('/admin/login');
   };
 
@@ -107,12 +135,42 @@ export default function AdminDashboard() {
       return;
     }
 
-    addProduct({ ...data, price, stock, image: imagePreview });
+    const { imageFile, ...productData } = data;
 
+    // Start image upload in background (don't block product creation)
+    let imageUrl = imagePreview;
+    const file = imageFile?.[0];
+    const uploadPromise = file && file instanceof File
+      ? adminApi.uploadProductImage(file).then(url => { imageUrl = url; }).catch(() => {
+          showAlert('Image upload failed. Using local preview.', 'warning');
+        })
+      : Promise.resolve();
+
+    // Add to Firestore first to get the real ID
+    let serverProduct;
     try {
-      await adminApi.addProduct({ name: data.name, price });
+      serverProduct = await adminApi.addProduct({ name: productData.name, price, stock, category: productData.category, image: imageUrl });
     } catch {
-      // Server sync is best-effort
+      // Firestore unavailable, add locally only
+      addProduct({ ...productData, price, stock, image: imageUrl });
+      reset();
+      setImagePreview('');
+      setShowAddModal(false);
+      showAlert('Product added locally!', 'success');
+      return;
+    }
+
+    // Wait for upload to finish
+    await uploadPromise;
+
+    // Add to local store with the Firestore ID so sync doesn't duplicate
+    addProduct({ ...productData, price, stock, image: imageUrl, id: serverProduct?.id });
+
+    // Update the Firestore document with the final image URL
+    if (serverProduct && imageUrl !== imagePreview) {
+      try {
+        await adminApi.updateProduct(serverProduct.id, { image: imageUrl });
+      } catch { /* ignore */ }
     }
 
     reset();
@@ -122,26 +180,62 @@ export default function AdminDashboard() {
     showAlert('Product added successfully!', 'success');
   };
 
+  const handleEditSubmit = async (data) => {
+    if (!editingProduct) return;
+
+    const price = Number(data.price);
+    const stock = Number(data.stock);
+
+    let imageUrl = editingProduct.image;
+    const file = data.imageFile?.[0];
+    if (file && file instanceof File) {
+      setUploadingImage(true);
+      try {
+        imageUrl = await adminApi.uploadProductImage(file, data.name);
+      } catch {
+        showAlert('Image upload failed. Keeping existing image.', 'warning');
+      }
+      setUploadingImage(false);
+    }
+
+    const updates = { name: data.name, price, stock, category: data.category, image: imageUrl };
+    updateProduct(editingProduct.id, updates);
+
+    try {
+      await adminApi.updateProduct(editingProduct.id, updates);
+    } catch {
+      // Server sync is best-effort
+    }
+
+    setShowEditModal(false);
+    setEditingProduct(null);
+    showAlert('Product updated successfully!', 'success');
+  };
+
+  const openEditModal = (product) => {
+    setEditingProduct(product);
+    setShowEditModal(true);
+  };
+
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredOrders = mockOrders.filter(order => 
-    order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.item.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredOrders = serverOrders.filter(order =>
+    order.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    order.address?.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!isAdminAuthenticated) return null; // Prevent flicker before redirect
+  if (!isAdminUser) return null; // Prevent flicker before redirect
 
   return (
     <div className="min-h-screen bg-[#faf6f0] font-sans flex text-gray-900">
 
       {/* Add Product Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-rose-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" onClick={handleCloseModal}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-rose-100" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-2xl font-bold text-rose-950 font-serif">Add New Product</h3>
               <button type="button" onClick={handleCloseModal} className="text-gray-400 hover:text-rose-950 bg-rose-50 hover:bg-amber-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
@@ -176,9 +270,56 @@ export default function AdminDashboard() {
               </div>
             <div>
               <label className="block text-sm font-bold text-rose-950 mb-1">Product Photo</label>
-              <input required type="file" accept="image/*" {...register('imageFile', { required: true, onChange: handleImageChange })} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 transition-all border-2 border-gray-200 rounded-xl p-2 bg-white cursor-pointer" />
+              <input type="file" accept="image/*" {...register('imageFile', { onChange: handleImageChange })} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 transition-all border-2 border-gray-200 rounded-xl p-2 bg-white cursor-pointer" />
+              {imagePreview && <img src={imagePreview} alt="Preview" className="mt-2 w-full h-40 object-cover rounded-lg border border-rose-100" />}
             </div>
-              <button type="submit" className="w-full bg-amber-500 text-rose-950 font-bold py-3 mt-2 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md">Save Product</button>
+              <button type="submit" disabled={uploadingImage} className="w-full bg-amber-500 text-rose-950 font-bold py-3 mt-2 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md disabled:opacity-50">{uploadingImage ? 'Uploading...' : 'Save Product'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-rose-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold text-rose-950 font-serif">Edit Product</h3>
+              <button type="button" onClick={() => { setShowEditModal(false); setEditingProduct(null); }} className="text-gray-400 hover:text-rose-950 bg-rose-50 hover:bg-amber-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form key={editingProduct.id} onSubmit={handleSubmit(handleEditSubmit)} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-rose-950 mb-1">Product Name</label>
+                <input required type="text" defaultValue={editingProduct.name} {...register('name', { required: true })} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-rose-950 mb-1">Price (₹)</label>
+                  <input required type="number" min="0" defaultValue={editingProduct.price} {...register('price', { required: true })} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-rose-950 mb-1">Stock</label>
+                  <input required type="number" min="0" defaultValue={editingProduct.stock || 0} {...register('stock', { required: true })} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-rose-950 mb-1">Category</label>
+                <select required defaultValue={editingProduct.category} {...register('category', { required: true })} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300">
+                  <option value="Women">Women</option>
+                  <option value="Men">Men</option>
+                  <option value="Jewellery">Jewellery</option>
+                  <option value="Footwear">Footwear</option>
+                  <option value="Accessories">Accessories</option>
+                </select>
+              </div>
+            <div>
+              <label className="block text-sm font-bold text-rose-950 mb-1">Product Photo</label>
+              <input type="file" accept="image/*" {...register('imageFile', { onChange: handleImageChange })} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 transition-all border-2 border-gray-200 rounded-xl p-2 bg-white cursor-pointer" />
+              <img src={imagePreview || editingProduct.image} alt="Current" className="mt-2 w-full h-40 object-cover rounded-lg border border-rose-100" />
+            </div>
+              <button type="submit" disabled={uploadingImage} className="w-full bg-amber-500 text-rose-950 font-bold py-3 mt-2 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md disabled:opacity-50">{uploadingImage ? 'Uploading...' : 'Update Product'}</button>
             </form>
           </div>
         </div>
@@ -450,7 +591,7 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-end mt-3">
                        <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
                        <div className="flex space-x-1">
-                          <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={() => openEditModal(product)} className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
                           <button onClick={async () => {
                             removeProduct(product.id);
                             try {
@@ -485,7 +626,7 @@ export default function AdminDashboard() {
             <div className="px-6 py-5 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
               <div>
                 <h3 className="text-xl font-bold text-rose-950 font-serif">Order Status Ticker</h3>
-                <p className="text-sm font-medium text-rose-900/60 mt-0.5">Live tracking of merchandise fulfillment</p>
+                <p className="text-sm font-medium text-rose-900/60 mt-0.5">Real orders from Firestore</p>
               </div>
               <button onClick={() => setActiveSection('orders')} className="text-sm font-bold text-amber-600 hover:text-amber-700 transition uppercase tracking-wider">View All Orders &rarr;</button>
             </div>
@@ -495,28 +636,28 @@ export default function AdminDashboard() {
                   <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
                     <th className="px-6 py-4 font-bold">Order ID</th>
                     <th className="px-6 py-4 font-bold">Customer</th>
-                    <th className="px-6 py-4 font-bold">Merchandise</th>
-                    <th className="px-6 py-4 font-bold">Status Badge</th>
+                    <th className="px-6 py-4 font-bold">Items</th>
+                    <th className="px-6 py-4 font-bold">Status</th>
                     <th className="px-6 py-4 font-bold text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rose-50">
-                  {filteredOrders.length > 0 ? filteredOrders.map((order, i) => (
-                    <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
-                      <td className="px-6 py-4 font-bold text-rose-950 text-sm">{order.id}</td>
-                      <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.name}</td>
-                      <td className="px-6 py-4 font-medium text-rose-900/70 text-sm">{order.item}</td>
+                  {serverOrders.length > 0 ? serverOrders.slice(0, 10).map((order) => (
+                    <tr key={order.id} className="hover:bg-rose-50/30 transition duration-150">
+                      <td className="px-6 py-4 font-bold text-rose-950 text-sm">#{order.id}</td>
+                      <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.address?.fullName || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-rose-900/70">{order.items?.length || 0} item(s)</td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${order.color}`}>
-                          {order.status}
+                        <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${STATUS_STYLES[order.status] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                          {order.status || 'Pending'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.amount}</td>
+                      <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.total ? formatINR(order.total) : 'N/A'}</td>
                     </tr>
                   )) : (
                     <tr>
                       <td colSpan="5" className="px-6 py-8 text-center text-rose-900/60 font-medium">
-                        No orders found matching "{searchQuery}"
+                        No orders yet. Orders will appear here once customers start purchasing.
                       </td>
                     </tr>
                   )}
@@ -551,7 +692,7 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-end mt-3">
                        <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
                        <div className="flex space-x-1">
-                          <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={() => openEditModal(product)} className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
                           <button onClick={async () => {
                             removeProduct(product.id);
                             try {
@@ -583,7 +724,15 @@ export default function AdminDashboard() {
 
         {activeSection === 'orders' && (
           <div>
-            <p className="text-sm font-medium text-rose-900/60 mb-6">Track and manage customer orders</p>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <p className="text-sm font-medium text-rose-900/60">Track and manage customer orders</p>
+              </div>
+              <button onClick={loadOrders} disabled={loadingOrders} className="flex items-center space-x-2 bg-rose-100 text-rose-950 px-4 py-2.5 rounded-full hover:bg-rose-200 transition shadow-sm font-bold text-sm">
+                <RefreshCw className={`w-4 h-4 ${loadingOrders ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
             <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -591,28 +740,62 @@ export default function AdminDashboard() {
                     <tr className="bg-white text-rose-900/50 text-[10px] uppercase tracking-widest border-b border-rose-100">
                       <th className="px-6 py-4 font-bold">Order ID</th>
                       <th className="px-6 py-4 font-bold">Customer</th>
-                      <th className="px-6 py-4 font-bold">Merchandise</th>
-                      <th className="px-6 py-4 font-bold">Status Badge</th>
+                      <th className="px-6 py-4 font-bold">Items</th>
+                      <th className="px-6 py-4 font-bold">Status</th>
                       <th className="px-6 py-4 font-bold text-right">Amount</th>
+                      <th className="px-6 py-4 font-bold text-right">Date</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-rose-50">
-                    {filteredOrders.length > 0 ? filteredOrders.map((order, i) => (
-                      <tr key={i} className="hover:bg-rose-50/30 transition duration-150">
-                        <td className="px-6 py-4 font-bold text-rose-950 text-sm">{order.id}</td>
-                        <td className="px-6 py-4 font-bold text-rose-900/80 text-sm">{order.name}</td>
-                        <td className="px-6 py-4 font-medium text-rose-900/70 text-sm">{order.item}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm ${order.color}`}>
-                            {order.status}
-                          </span>
+                    {loadingOrders ? (
+                      <tr>
+                        <td colSpan="6" className="px-6 py-12 text-center text-rose-900/60 font-medium">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                         </td>
-                        <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">{order.amount}</td>
+                      </tr>
+                    ) : filteredOrders.length > 0 ? filteredOrders.map((order) => (
+                      <tr key={order.id || order.$id} className="hover:bg-rose-50/30 transition duration-150">
+                        <td className="px-6 py-4 font-bold text-rose-950 text-sm">#{order.id}</td>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-rose-900/80 text-sm">{order.address?.fullName || 'N/A'}</p>
+                          <p className="text-xs text-rose-900/50">{order.userEmail || order.address?.phone || ''}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-rose-900/70">
+                          {order.items?.length || 0} item(s)
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={order.status || 'Pending'}
+                            onChange={async (e) => {
+                              const newStatus = e.target.value;
+                              try {
+                                await adminApi.updateOrderStatus(order.id, newStatus);
+                                setServerOrders(prev =>
+                                  prev.map(o => o.id === order.id ? { ...o, status: newStatus } : o)
+                                );
+                                showAlert(`Order #${order.id} status updated to ${newStatus}`, 'success');
+                              } catch {
+                                showAlert('Failed to update status', 'warning');
+                              }
+                            }}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full border shadow-sm outline-none cursor-pointer ${STATUS_STYLES[order.status] || STATUS_STYLES['Pending']}`}
+                          >
+                            {STATUS_OPTIONS.map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-rose-950 text-right font-serif text-base">
+                          {order.total ? formatINR(order.total) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-rose-900/60 text-right">
+                          {order.date || ''}
+                        </td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan="5" className="px-6 py-8 text-center text-rose-900/60 font-medium">
-                          No orders found matching "{searchQuery}"
+                        <td colSpan="6" className="px-6 py-8 text-center text-rose-900/60 font-medium">
+                          No orders found.
                         </td>
                       </tr>
                     )}

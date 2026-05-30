@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy, useMemo } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { adminApi } from './services/api';
 const Home = lazy(() => import('./components/Home'));
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp';
@@ -11,6 +12,7 @@ import Cart from './components/Cart';
 import Orders from './components/Orders';
 import Checkout from './components/Checkout';
 import Wishlist from './components/Wishlist';
+import MfaSetup from './components/MfaSetup';
 import AdminLogin from './admin/AdminLogin';
 import AdminDashboard from './admin/AdminDashboard';
 import Terms from './components/Terms';
@@ -56,12 +58,20 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-      import('./services/db').then(({ productsService }) => {
-        productsService.getAll()
-          .then(() => setServerConnected(true))
-          .catch(() => {});
-      }).catch(() => {});
+      adminApi.healthCheck()
+        .then((res) => setServerConnected(!!res))
+        .catch(() => {});
     }, [setServerConnected]);
+
+    useEffect(() => {
+      adminApi.getProducts()
+        .then((serverProducts) => {
+          if (serverProducts && serverProducts.length > 0) {
+            useStore.getState().syncProducts(serverProducts);
+          }
+        })
+        .catch(() => {});
+    }, []);
 
     const searchResults = useMemo(() => {
         if (debouncedSearch.trim() === "") {
@@ -217,13 +227,13 @@ export default function App() {
             {!isAdminPage && !serverConnected && (
               <div className="bg-amber-50 border-b-2 border-amber-300 text-amber-800 text-xs font-bold text-center py-2 px-4 tracking-wide flex items-center justify-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                Sandbox Mode — Backend server not connected. Changes are local only.
+                Backend server not connected. Orders saved locally only. Run <code className="bg-amber-100 px-1 rounded font-mono">npm run server</code> to enable payments &amp; sync.
               </div>
             )}
             {!isAdminPage && serverConnected && (
               <div className="bg-green-50 border-b-2 border-green-300 text-green-800 text-xs font-bold text-center py-2 px-4 tracking-wide flex items-center justify-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                Live Connection — Backend server connected. Data is synced.
+                Live Connection — Backend server connected. Payments, email &amp; data sync enabled.
               </div>
             )}
 
@@ -317,18 +327,19 @@ export default function App() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <Suspense fallback={<div className="flex items-center justify-center py-24 text-rose-950 font-serif text-xl tracking-widest">Loading...</div>}>
                     <Routes>
-                        <Route path="/" element={<Home products={products} searchResults={searchResults} searchQuery={searchQuery} />} />
-                        <Route path="/signin" element={<SignIn />} />
-                        <Route path="/signup" element={<SignUp />} />
-                        <Route path="/account" element={<Account />} />
-                        <Route path="/orders" element={<Orders />} />
-                        <Route path="/product/:id" element={<ProductDetail />} />
-                        <Route path="/checkout" element={<Checkout />} />
-                        <Route path="/wishlist" element={<Wishlist />} />
-                        <Route path="/admin/login" element={<AdminLogin />} />
-                        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                        <Route path="/terms" element={<Terms />} />
-                        <Route path="*" element={<NotFound />} />
+                        <Route path="/" element={<ErrorBoundary><Home products={products} searchResults={searchResults} searchQuery={searchQuery} /></ErrorBoundary>} />
+                        <Route path="/signin" element={<ErrorBoundary><SignIn /></ErrorBoundary>} />
+                        <Route path="/signup" element={<ErrorBoundary><SignUp /></ErrorBoundary>} />
+                        <Route path="/account" element={<ErrorBoundary><Account /></ErrorBoundary>} />
+                        <Route path="/orders" element={<ErrorBoundary><Orders /></ErrorBoundary>} />
+                        <Route path="/product/:id" element={<ErrorBoundary><ProductDetail /></ErrorBoundary>} />
+                        <Route path="/checkout" element={<ErrorBoundary><Checkout /></ErrorBoundary>} />
+                        <Route path="/wishlist" element={<ErrorBoundary><Wishlist /></ErrorBoundary>} />
+                        <Route path="/mfa-setup" element={<ErrorBoundary><MfaSetup /></ErrorBoundary>} />
+                        <Route path="/admin/login" element={<ErrorBoundary><AdminLogin /></ErrorBoundary>} />
+                        <Route path="/admin/dashboard" element={<ErrorBoundary><AdminDashboard /></ErrorBoundary>} />
+                        <Route path="/terms" element={<ErrorBoundary><Terms /></ErrorBoundary>} />
+                        <Route path="*" element={<ErrorBoundary><NotFound /></ErrorBoundary>} />
                     </Routes>
                 </Suspense>
             </main>

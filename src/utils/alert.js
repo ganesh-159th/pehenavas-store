@@ -26,11 +26,19 @@ export function showAlert(message, type = 'success') {
   const el = document.createElement('div');
   el.className = 'global-alert-card';
 
-  el.innerHTML = `
-    <span class="global-alert-icon">${config.icon}</span>
-    <span class="global-alert-msg">${message}</span>
-    <button class="global-alert-close" aria-label="Dismiss">&times;</button>
-  `;
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'global-alert-icon';
+  iconSpan.textContent = config.icon;
+  const msgSpan = document.createElement('span');
+  msgSpan.className = 'global-alert-msg';
+  msgSpan.textContent = message;
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'global-alert-close';
+  closeBtn.setAttribute('aria-label', 'Dismiss');
+  closeBtn.innerHTML = '&times;';
+  el.appendChild(iconSpan);
+  el.appendChild(msgSpan);
+  el.appendChild(closeBtn);
 
   el.querySelector('.global-alert-close').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -51,4 +59,4 @@ function dismiss(el) {
   el.addEventListener('transitionend', () => el.remove(), { once: true });
 }
 
-window.showAlert = showAlert;
+
