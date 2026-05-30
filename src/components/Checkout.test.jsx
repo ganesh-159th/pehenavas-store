@@ -16,6 +16,16 @@ vi.mock('../hooks/useUser', () => ({
   useUser: vi.fn()
 }));
 
+// Mock api service so network calls resolve immediately
+vi.mock('../services/api', () => ({
+  adminApi: {
+    addOrder: vi.fn(() => Promise.resolve()),
+    sendOrderConfirmation: vi.fn(() => Promise.resolve()),
+    createPaymentOrder: vi.fn(() => Promise.resolve({ id: 'test_order_id' })),
+    verifyPayment: vi.fn(() => Promise.resolve()),
+  },
+}));
+
 // 2. Mock utils for predictable formatting
 vi.mock('../utils.js', () => ({
   formatINR: (amount) => `₹${amount}`
@@ -90,7 +100,7 @@ describe('Checkout Component', () => {
     expect(placeOrderBtn).not.toBeDisabled(); // Enabled now!
   });
 
-  it('processes COD order and shows the Order Summary after a delay', () => {
+  it('processes COD order and shows the Order Summary after a delay', async () => {
     useCart.mockReturnValue({
       cart: [{ id: '1', name: 'Test Product', price: 1000, qty: 1 }],
       cartTotal: 1000,
@@ -110,10 +120,8 @@ describe('Checkout Component', () => {
     fireEvent.click(placeOrderBtn);
     expect(screen.getByText(/Placing Order\.\.\./i)).toBeInTheDocument();
 
-    // 3. Fast-forward time to skip the 1000ms setTimeout
-    act(() => {
-      vi.runAllTimers();
-    });
+    // 3. Flush pending microtasks from async completeOrder
+    await act(async () => {});
 
     // 4. Verify the checkout screen is replaced by the Order Summary
     expect(screen.getByTestId('mock-order-summary')).toBeInTheDocument();
@@ -186,7 +194,7 @@ describe('Checkout Component', () => {
       expect(screen.queryByText(/Please enter a valid 16-digit card number/i)).not.toBeInTheDocument();
     });
 
-    it('processes valid card order successfully and shows Order Summary', () => {
+    it('processes valid card order successfully and shows Order Summary', async () => {
       render(<Checkout />, { wrapper: BrowserRouter });
       fillAddress();
       fireEvent.click(screen.getByText(/Credit \/ Debit Card/i));
@@ -198,6 +206,7 @@ describe('Checkout Component', () => {
       expect(screen.getByText(/Placing Order\.\.\./i)).toBeInTheDocument();
       
       act(() => { vi.runAllTimers(); });
+      await act(async () => {});
       expect(screen.getByTestId('mock-order-summary')).toBeInTheDocument();
     });
   });
@@ -350,7 +359,7 @@ describe('Checkout Component', () => {
       expect(screen.getAllByText('₹2500').length).toBeGreaterThan(0);
     });
 
-    it('correctly passes multiple items to Order Summary after placement', () => {
+    it('correctly passes multiple items to Order Summary after placement', async () => {
       const mockClearCart = vi.fn();
       useCart.mockReturnValue({
         cart: [
@@ -366,7 +375,7 @@ describe('Checkout Component', () => {
       fillAddress();
       fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
       
-      act(() => { vi.runAllTimers(); });
+      await act(async () => {});
       expect(screen.getByTestId('mock-order-summary')).toBeInTheDocument();
       expect(mockClearCart).toHaveBeenCalled();
     });
@@ -389,13 +398,13 @@ describe('Checkout Component', () => {
       expect(screen.queryByText(/Secure Checkout/i)).not.toBeInTheDocument();
     });
 
-    it('generates correct Order ID (PHN-XXXXXX) and Delivery Date (3-5 days)', () => {
+    it('generates correct Order ID (PHN-XXXXXX) and Delivery Date (3-5 days)', async () => {
       render(<Checkout />, { wrapper: BrowserRouter });
       fireEvent.click(screen.getByText(/Cash on Delivery/i));
       fillAddress();
       fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
       
-      act(() => { vi.runAllTimers(); });
+      await act(async () => {});
       
       expect(screen.getByTestId('order-id').textContent).toMatch(/^PHN-\d{6}$/);
       
@@ -405,7 +414,7 @@ describe('Checkout Component', () => {
       expect(typeof deliveryDate).toBe('string');
     });
 
-    it('clears the cart after a successful order', () => {
+    it('clears the cart after a successful order', async () => {
       const mockClearCart = vi.fn();
       useCart.mockReturnValue({
         cart: [{ id: '1', name: 'Test', price: 1000, qty: 1 }],
@@ -417,7 +426,7 @@ describe('Checkout Component', () => {
       fillAddress();
       fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
       
-      act(() => { vi.runAllTimers(); });
+      await act(async () => {});
       
       expect(mockClearCart).toHaveBeenCalledTimes(1);
     });

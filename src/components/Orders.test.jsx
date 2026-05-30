@@ -1,8 +1,15 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Orders from './Orders';
 import { useStore } from '../store/useStore';
+
+// Mock api so getOrders rejects (falling through to local store)
+vi.mock('../services/api', () => ({
+  adminApi: {
+    getOrders: vi.fn(() => Promise.reject(new Error('not available'))),
+  }
+}));
 
 // Reset the store before each test
 beforeEach(() => {
@@ -22,13 +29,14 @@ beforeEach(() => {
 });
 
 describe('Orders Component', () => {
-  it('renders a list of orders correctly', () => {
+  it('renders a list of orders correctly', async () => {
     render(<Orders />);
     
-    // Verify the static heading
+    // Wait for loading to finish and data to appear
+    await waitFor(() => {
+      expect(screen.getByText('Order #ORD-12345')).toBeInTheDocument();
+    });
     expect(screen.getByText('Your Orders')).toBeInTheDocument();
-    // Verify the mocked data is displayed
-    expect(screen.getByText('Order #ORD-12345')).toBeInTheDocument();
     expect(screen.getByText('Royal Silk Kurta')).toBeInTheDocument();
     expect(screen.getByText('Delivered')).toBeInTheDocument();
   });

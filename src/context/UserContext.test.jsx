@@ -22,12 +22,12 @@ vi.mock('firebase/auth', async () => {
       return vi.fn();
     }),
     signInWithEmailAndPassword: vi.fn(async (_auth, email) => {
-      const user = { uid: '123', email, displayName: email.split('@')[0] };
+      const user = { uid: '123', email, displayName: email.split('@')[0], getIdTokenResult: vi.fn(() => Promise.resolve({ claims: {} })) };
       if (authStateCallback) authStateCallback(user);
       return { user };
     }),
     createUserWithEmailAndPassword: vi.fn(async (_auth, email) => {
-      const user = { uid: '456', email, displayName: null };
+      const user = { uid: '456', email, displayName: null, getIdTokenResult: vi.fn(() => Promise.resolve({ claims: {} })) };
       return { user };
     }),
     updateProfile: vi.fn(async () => {}),
