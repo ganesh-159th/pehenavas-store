@@ -8,6 +8,9 @@ const TYPES = {
   warning: {
     icon: '🟡',
   },
+  info: {
+    icon: '🔵',
+  },
 };
 
 let container = null;

@@ -16,7 +16,7 @@ const RoyalLotus = ({ className }) => (
 );
 
 const SignUp = () => {
-  const { login } = useUser();
+  const { signup } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [name, setName] = useState('');
@@ -63,16 +63,26 @@ const SignUp = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     if (!validate()) {
       showAlert('Please fix the form errors before creating an account.', 'warning');
       return;
     }
-    login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
-    showAlert('Account created successfully! Welcome aboard.', 'success');
-    const from = location.state?.from || '/';
-    navigate(from, { replace: true });
+    try {
+      await signup(name, email, password);
+      showAlert('Account created successfully! Welcome aboard.', 'success');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      const msg = err.code === 'auth/email-already-in-use'
+        ? 'An account with this email already exists.'
+        : err.code === 'auth/weak-password'
+          ? 'Password is too weak.'
+          : err.message || 'Sign up failed. Please try again.';
+      setErrors({ form: msg });
+      showAlert(msg, 'danger');
+    }
   };
 
   return (
@@ -235,6 +245,13 @@ const SignUp = () => {
                   </div>
                 )}
               </div>
+
+              {errors.form && (
+                <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-300 rounded-lg shadow-sm">
+                  <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-rose-800 text-sm font-medium leading-tight">{errors.form}</p>
+                </div>
+              )}
 
               <button
                 type="submit"

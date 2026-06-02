@@ -1,5 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
+
+const serviceAccount = JSON.parse(
+  readFileSync('./pehenavas-db-firebase-adminsdk-fbsvc-db464a7991.json', 'utf-8')
+);
+
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+const db = admin.firestore();
 
 const app = express();
 app.use(cors());
@@ -13,6 +22,29 @@ let products = [
 ];
 
 let nextId = 100;
+
+app.post('/api/orders', async (req, res) => {
+  const order = { ...req.body };
+  try {
+    await db.collection('orders').doc(order.id).set(order);
+    console.log(`[ORDER] 🟢 Order ${order.id} saved to Firestore`);
+    res.status(201).json(order);
+  } catch (err) {
+    console.error(`[ORDER] 🔴 Failed to save order ${order.id}:`, err.message);
+    res.status(500).json({ error: 'Failed to save order' });
+  }
+});
+
+app.get('/api/orders', async (_req, res) => {
+  try {
+    const snapshot = await db.collection('orders').orderBy('date', 'desc').get();
+    const orders = snapshot.docs.map(doc => doc.data());
+    res.json(orders);
+  } catch (err) {
+    console.error('[ORDER] 🔴 Failed to fetch orders:', err.message);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
 
 app.get('/api/products', (_req, res) => {
   console.log('[ADMIN ACTION] 📋 FETCH: Products list retrieved');

@@ -4,8 +4,8 @@ import { Lock, User, Store, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from
 import { useStore } from '../store/useStore';
 
 export default function AdminLogin() {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -176,10 +176,6 @@ export default function AdminLogin() {
         
         {/* Bottom Text */}
         <div className="mt-8 text-center">
-          <div className="inline-flex items-center justify-center gap-1.5 mb-2 bg-amber-100 text-amber-800 py-1.5 px-3 rounded-md text-xs font-bold border border-amber-200 shadow-sm">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Using Default Test Credentials</span>
-          </div>
           <p className="text-xs font-bold text-rose-900/40 uppercase tracking-widest">
             &copy; {new Date().getFullYear()} Pehenavas Admin.
           </p>

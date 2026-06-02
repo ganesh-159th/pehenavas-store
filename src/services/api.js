@@ -30,4 +30,23 @@ export const adminApi = {
     }
     return res.json();
   },
+
+  async addOrder(order) {
+    const res = await fetch(`${API_BASE}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to place order');
+    }
+    return res.json();
+  },
+
+  async getOrders() {
+    const res = await fetch(`${API_BASE}/orders`);
+    if (!res.ok) throw new Error('Failed to fetch orders');
+    return res.json();
+  },
 };

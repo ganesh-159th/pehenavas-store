@@ -11,7 +11,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/saree,india,traditional?lock=1",
     category: "Women",
     description: "Traditional Rajputana poshak with heavy gota patti and zardozi work. Perfect for brides.",
-    colors: ["Maroon", "Gold", "Red"]
+    colors: ["Maroon", "Gold", "Red"],
+    stock: 25
   },
   {
     id: 2,
@@ -23,7 +24,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/sherwani,india,groom?lock=2",
     category: "Men",
     description: "Classic men's Jodhpuri sherwani suit paired with a vibrant red safa (turban).",
-    colors: ["Ivory", "Navy", "Burgundy"]
+    colors: ["Ivory", "Navy", "Burgundy"],
+    stock: 18
   },
   {
     id: 3,
@@ -35,7 +37,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/bandhani,saree?lock=3",
     category: "Women",
     description: "Authentic tie and dye Bandhani saree in bright pink and yellow hues.",
-    colors: ["Pink", "Yellow", "Green"]
+    colors: ["Pink", "Yellow", "Green"],
+    stock: 40
   },
   {
     id: 4,
@@ -47,7 +50,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/kurta,india,cotton?lock=4",
     category: "Men",
     description: "Comfortable cotton kurta featuring traditional Sanganeri hand-block prints.",
-    colors: ["White", "Blue", "Beige"]
+    colors: ["White", "Blue", "Beige"],
+    stock: 60
   },
   {
     id: 5,
@@ -59,7 +63,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/dupatta,clothing,india?lock=5",
     category: "Women",
     description: "A gorgeous multicolored wave-patterned Leheriya dupatta.",
-    colors: ["Multicolor", "Orange", "Purple"]
+    colors: ["Multicolor", "Orange", "Purple"],
+    stock: 85
   },
   {
     id: 6,
@@ -71,7 +76,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/lehenga,bridal,india?lock=6",
     category: "Women",
     description: "Exquisite bridal lehenga with detailed kundan and mirror work.",
-    colors: ["Red", "Pink", "Gold"]
+    colors: ["Red", "Pink", "Gold"],
+    stock: 10
   },
   {
     id: 7,
@@ -83,7 +89,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/mojari,shoes,india?lock=7",
     category: "Footwear",
     description: "Handcrafted leather mojaris with colorful thread embroidery.",
-    colors: ["Brown", "Black", "Gold"]
+    colors: ["Brown", "Black", "Gold"],
+    stock: 50
   },
   {
     id: 8,
@@ -95,7 +102,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/choli,mirrorwork,clothing?lock=8",
     category: "Women",
     description: "Vibrant choli embellished with traditional mirror work (Abhla Bharat).",
-    colors: ["Green", "Blue", "Orange"]
+    colors: ["Green", "Blue", "Orange"],
+    stock: 22
   },
   {
     id: 9,
@@ -107,7 +115,8 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/jhumka,jewelry,india?lock=9",
     category: "Jewellery",
     description: "Traditional bell-shaped earrings crafted with gold-plating and faux Kundan.",
-    colors: ["Gold", "Silver"]
+    colors: ["Gold", "Silver"],
+    stock: 100
   },
   {
     id: 10,
@@ -119,6 +128,7 @@ export const PRODUCTS = [
     image: "https://loremflickr.com/600/800/sherwani,royal,men?lock=10",
     category: "Men",
     description: "A tailored sherwani jacket perfect for groomsmen and festive occasions.",
-    colors: ["Ivory", "Maroon", "Black"]
+    colors: ["Ivory", "Maroon", "Black"],
+    stock: 15
   }
 ];

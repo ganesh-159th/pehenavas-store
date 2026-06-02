@@ -5,11 +5,12 @@ import ErrorBoundary from './components/ErrorBoundary';
 const Home = lazy(() => import('./components/Home'));
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp';
-import Account from './components/Account';
+
 const ProductDetail = lazy(() => import('./components/ProductDetail'));
 import Cart from './components/Cart';
 import Orders from './components/Orders';
-import Checkout from './components/Checkout';
+import CheckoutForm from './components/CheckoutForm';
+import UserDashboard from './components/UserDashboard';
 import Wishlist from './components/Wishlist';
 import AdminLogin from './admin/AdminLogin';
 import AdminDashboard from './admin/AdminDashboard';
@@ -318,10 +319,10 @@ export default function App() {
                         <Route path="/" element={<Home products={products} searchResults={searchResults} searchQuery={searchQuery} />} />
                         <Route path="/signin" element={<SignIn />} />
                         <Route path="/signup" element={<SignUp />} />
-                        <Route path="/account" element={<Account />} />
+                        <Route path="/account" element={<UserDashboard />} />
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/product/:id" element={<ProductDetail />} />
-                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/checkout" element={<CheckoutForm />} />
                         <Route path="/wishlist" element={<Wishlist />} />
                         <Route path="/admin/login" element={<AdminLogin />} />
                         <Route path="/admin/dashboard" element={<AdminDashboard />} />

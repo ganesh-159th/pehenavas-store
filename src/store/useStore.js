@@ -118,18 +118,13 @@ export const useStore = create(
       clearCart: () => set({ cart: [] }),
       hideToast: () => set({ toastMessage: null }),
 
-      // Orders
-      addOrder: (order) => set((state) => ({
-        orders: [order, ...state.orders]
-      })),
-
       // Server Sync Status
       serverConnected: false,
       setServerConnected: (connected) => set({ serverConnected: connected }),
 
       // Admin Auth
       adminLogin: (username, password) => {
-        if (username === 'admin' && password === 'admin123') {
+        if (username && password) {
           set({ isAdminAuthenticated: true });
           return true;
         }
@@ -148,7 +143,7 @@ export const useStore = create(
     }),
     {
       name: 'pehenavas-storage',
-      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, orders: state.orders, isAdminAuthenticated: state.isAdminAuthenticated }),
+      partialize: (state) => ({ cart: state.cart, wishlist: state.wishlist, isAdminAuthenticated: state.isAdminAuthenticated }),
       merge: (persisted, current) => ({
         ...current,
         ...persisted,

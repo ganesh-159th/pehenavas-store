@@ -7,12 +7,11 @@ import { useUser } from '../hooks/useUser';
 import { Navigate, Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
-import { useStore } from '../store/useStore';
+import { adminApi } from '../services/api';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
     const { user } = useUser();
-    const { addOrder } = useStore();
     const [paymentMethod, setPaymentMethod] = useState("upi");
     const [upiId, setUpiId] = useState("");
     const [upiIdVerified, setUpiIdVerified] = useState(null);
@@ -97,7 +96,7 @@ const Checkout = () => {
         }
 
         setOrderPlaced(true);
-        setTimeout(() => {
+        setTimeout(async () => {
             const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
             const today = new Date();
             const deliveryDate = new Date(today);
@@ -111,7 +110,7 @@ const Checkout = () => {
                 status: 'Confirmed',
                 address: { ...address }
             };
-            addOrder(order);
+            await adminApi.addOrder(order);
             setFinalOrder({ 
                 cart: [...cart], 
                 cartTotal,

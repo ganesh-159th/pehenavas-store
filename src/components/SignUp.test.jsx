@@ -22,11 +22,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 describe('SignUp Component', () => {
-  const mockLogin = vi.fn();
+  const mockSignup = vi.fn().mockResolvedValue({});
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useUser.mockReturnValue({ login: mockLogin });
+    useUser.mockReturnValue({ signup: mockSignup });
   });
 
   const renderComponent = () => render(<SignUp />, { wrapper: BrowserRouter });
@@ -131,7 +131,7 @@ describe('SignUp Component', () => {
   });
 
   describe('Successful Registration', () => {
-    it('calls login and navigates to home when registration is fully valid', () => {
+    it('calls signup and navigates to home when registration is fully valid', async () => {
       renderComponent();
       
       // Fill out valid data
@@ -144,15 +144,11 @@ describe('SignUp Component', () => {
       // Submit
       fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
       
-      // Should not show any errors
-      expect(screen.queryByText('Full name is required.')).not.toBeInTheDocument();
-      expect(screen.queryByText(/Password must be at least 8 characters/i)).not.toBeInTheDocument();
-      
-      // Should capitalize the first letter of the name!
-      expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
-      
-      // Should navigate to Home
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+      // Wait for async signup to resolve
+      await vi.waitFor(() => {
+        expect(mockSignup).toHaveBeenCalledWith('ganesh kumar', 'ganesh@example.com', 'StrongPass@123');
+        expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+      });
     });
   });
 });

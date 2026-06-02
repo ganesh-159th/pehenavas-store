@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../hooks/useUser';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Loader2, Mail, ArrowLeft, X } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
 
@@ -16,14 +16,17 @@ const RoyalLotus = ({ className }) => (
 );
 
 const SignIn = () => {
-  const { login } = useUser();
+  const { login, resetPassword } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const isVisible = useFadeIn();
 
   useEffect(() => {
@@ -44,32 +47,57 @@ const SignIn = () => {
 
     if (!password) {
       newErrors.password = 'Password is required.';
-    } else {
-      const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
-      if (!strongRegex.test(password)) {
-        newErrors.password = 'Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character.';
-      }
-    }
-
-    if (!agreeTerms) {
-      newErrors.agreeTerms = 'You must agree to the terms and conditions to sign in.';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignIn = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
     if (!validate()) {
       showAlert('Please fix the form errors before signing in.', 'warning');
       return;
     }
-    const userName = email.split('@')[0];
-    login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
-    showAlert('Signed in successfully! Welcome back.', 'success');
-    const from = location.state?.from || '/';
-    navigate(from, { replace: true });
+    try {
+      await login(email, password);
+      showAlert('Signed in successfully! Welcome back.', 'success');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      const msg = err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential'
+        ? 'Invalid email or password.'
+        : err.code === 'auth/too-many-requests'
+          ? 'Too many attempts. Please try again later.'
+          : err.message || 'Sign in failed. Please try again.';
+      setErrors({ form: msg });
+      showAlert(msg, 'danger');
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      showAlert('Please enter your email address.', 'warning');
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetPassword(resetEmail);
+      setResetSent(true);
+      showAlert('Password reset email sent! Check your inbox.', 'success');
+    } catch (err) {
+      const msg = err.code === 'auth/user-not-found'
+        ? 'No account found with this email.'
+        : err.code === 'auth/too-many-requests'
+          ? 'Too many requests. Please try again later.'
+          : err.code === 'auth/invalid-email'
+            ? 'Please enter a valid email address.'
+            : err.message || 'Failed to send reset email.';
+      showAlert(msg, 'danger');
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
@@ -166,29 +194,22 @@ const SignIn = () => {
               )}
               </div>
 
-              <div className="flex flex-col">
-                <div className="flex items-center">
-                  <input
-                    id="terms"
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={(e) => {
-                      setAgreeTerms(e.target.checked);
-                      if (errors.agreeTerms) setErrors({ ...errors, agreeTerms: null });
-                    }}
-                    className="w-4 h-4 border-gray-300 rounded cursor-pointer accent-amber-500"
-                  />
-                  <label htmlFor="terms" className="ml-2 text-sm text-gray-600 cursor-pointer">
-                    I agree to the <Link to="/terms" className="text-amber-600 hover:underline" target="_blank">Terms and Conditions</Link>
-                  </label>
-                </div>
-                {errors.agreeTerms && (
-                  <div className="flex items-start gap-2 mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-md shadow-sm">
-                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-rose-800 text-xs font-medium leading-tight">{errors.agreeTerms}</p>
-                  </div>
-                )}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(true)}
+                  className="text-sm font-bold text-amber-600 hover:text-amber-500 transition-colors"
+                >
+                  Forgot password?
+                </button>
               </div>
+
+              {errors.form && (
+                <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-300 rounded-lg shadow-sm">
+                  <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-rose-800 text-sm font-medium leading-tight">{errors.form}</p>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -229,6 +250,83 @@ const SignIn = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-amber-100">
+            <div className="h-1 bg-gradient-to-r from-rose-950 via-amber-500 to-rose-950"></div>
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-rose-950">Reset Password</h2>
+                <button
+                  type="button"
+                  onClick={() => { setShowResetModal(false); setResetSent(false); setResetEmail(''); }}
+                  className="text-gray-400 hover:text-rose-950 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {!resetSent ? (
+                <form onSubmit={handleResetPassword} className="space-y-5">
+                  <p className="text-sm text-gray-600">
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+                  <div>
+                    <label htmlFor="reset-email" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Email address
+                    </label>
+                    <input
+                      id="reset-email"
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-500 transition-all outline-none"
+                      placeholder="you@example.com"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={resetting}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-950 to-rose-900 text-white font-semibold rounded-lg hover:shadow-lg hover:from-rose-900 hover:to-rose-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {resetting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4" />
+                        Send Reset Link
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                    <Mail className="w-8 h-8 text-green-600" />
+                  </div>
+                  <p className="text-gray-700 text-sm">
+                    Check your inbox at <strong>{resetEmail}</strong> for the password reset link.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setShowResetModal(false); setResetSent(false); setResetEmail(''); }}
+                    className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-500 font-semibold text-sm transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Sign In
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
