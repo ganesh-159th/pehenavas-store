@@ -228,7 +228,7 @@ const ProductDetail = () => {
                                 <p className="text-rose-900/80 text-sm leading-relaxed">{review.comment}</p>
                                 {review.date && (
                                     <p className="text-xs text-rose-900/40 mt-2">
-                                        {review.date.toDate?.().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                        {new Date(review.date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
                                     </p>
                                 )}
                             </div>
