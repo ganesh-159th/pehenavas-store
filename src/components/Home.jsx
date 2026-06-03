@@ -226,6 +226,9 @@ const Home = ({ searchResults, searchQuery }) => {
                                 <button className="hidden md:block text-gray-400 hover:text-gray-600 transition-colors" onClick={() => dispatch({ type: 'SET_QUICK_VIEW_PRODUCT', payload: null })}><X className="w-6 h-6"/></button>
                             </div>
                             <p className="font-serif text-2xl md:text-3xl font-bold text-amber-600 mt-2 md:mt-4">{formatINR(quickViewProduct.price)}</p>
+                            {quickViewProduct.description && (
+                                <p className="text-rose-800/70 text-sm mt-3 leading-relaxed">{quickViewProduct.description}</p>
+                            )}
                             <div className="mt-4 md:mt-6">
                                 <p className="text-gray-500 text-sm">Size:</p>
                                 <div className="flex gap-2 mt-2">

@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const { register, handleSubmit, reset } = useForm({
-    defaultValues: { name: '', price: '', stock: '', category: '', imageFile: '' }
+    defaultValues: { name: '', price: '', stock: '', category: '', description: '', imageFile: '' }
   });
   const [imagePreview, setImagePreview] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,7 +113,7 @@ export default function AdminDashboard() {
     addProduct({ ...data, price, stock, image: imagePreview });
 
     try {
-      await adminApi.addProduct({ name: data.name, price });
+      await adminApi.addProduct({ name: data.name, price, description: data.description, stock, category: data.category });
     } catch {
       // Server sync is best-effort
     }
@@ -176,6 +176,10 @@ export default function AdminDashboard() {
                   <option value="Footwear">Footwear</option>
                   <option value="Accessories">Accessories</option>
                 </select>
+              </div>
+            <div>
+                <label className="block text-sm font-bold text-rose-950 mb-1">Description</label>
+                <textarea rows="3" placeholder="Product description..." {...register('description')} className="block w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white shadow-sm hover:border-gray-300 resize-none" />
               </div>
             <div>
               <label className="block text-sm font-bold text-rose-950 mb-1">Product Photo</label>

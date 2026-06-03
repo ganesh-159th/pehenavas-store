@@ -3,6 +3,15 @@ import { persist } from 'zustand/middleware';
 import { PRODUCTS } from '../data/products.js';
 import { showAlert } from '../utils/alert';
 
+// Sync Zustand store across browser tabs via the storage event
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'pehenavas-storage') {
+      useStore.persist.rehydrate();
+    }
+  });
+}
+
 export const useStore = create(
   persist(
     (set) => ({
