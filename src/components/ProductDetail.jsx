@@ -27,7 +27,6 @@ const ProductDetail = () => {
 
     useEffect(() => {
       if (!product) return;
-      setLoadingReviews(true);
       getProductReviews(product.id)
         .then(setReviews)
         .catch(() => {})
