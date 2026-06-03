@@ -1,5 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
+
+const serviceAccount = JSON.parse(
+  readFileSync('./pehenavas-db-firebase-adminsdk-fbsvc-db464a7991.json', 'utf-8')
+);
+
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+const db = admin.firestore();
 
 const app = express();
 app.use(cors());
@@ -44,6 +53,44 @@ app.post('/api/products/add', (req, res) => {
   products.push(product);
   console.log(`[ADMIN ACTION] 🟢 SUCCESS: Product "${product.name}" added (₹${product.price})`);
   res.status(201).json(product);
+});
+
+app.get('/api/reviews/:productId', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    const snapshot = await db.collection('reviews')
+      .where('productId', '==', String(productId))
+      .orderBy('date', 'desc')
+      .get();
+    const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(reviews);
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to fetch reviews:', err.message);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+
+app.post('/api/reviews', async (req, res) => {
+  const { productId, userId, userName, rating, comment } = req.body;
+  if (!productId || !userId || !rating || !comment?.trim()) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const review = {
+      productId: String(productId),
+      userId,
+      userName: userName || 'Anonymous',
+      rating: Number(rating),
+      comment: comment.trim(),
+      date: new Date().toISOString(),
+    };
+    const docRef = await db.collection('reviews').add(review);
+    console.log(`[REVIEW] ⭐ Review added for product #${productId} (${review.rating}/5)`);
+    res.status(201).json({ id: docRef.id, ...review });
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to save review:', err.message);
+    res.status(500).json({ error: 'Failed to save review' });
+  }
 });
 
 app.delete('/api/products/remove/:id', (req, res) => {

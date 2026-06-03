@@ -1,28 +1,20 @@
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+const API_BASE = 'http://localhost:3001/api';
 
 export async function addReview({ productId, userId, userName, rating, comment }) {
-  const docRef = await addDoc(collection(db, 'reviews'), {
-    productId: String(productId),
-    userId,
-    userName,
-    rating: Number(rating),
-    comment,
-    date: new Date().toISOString(),
+  const res = await fetch(`${API_BASE}/reviews`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId, userId, userName, rating, comment }),
   });
-  return docRef.id;
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to add review');
+  }
+  return res.json();
 }
 
 export async function getProductReviews(productId) {
-  const q = query(
-    collection(db, 'reviews'),
-    where('productId', '==', String(productId))
-  );
-  const snapshot = await getDocs(q);
-  const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  return reviews.sort((a, b) => {
-    const dateA = a.date ? new Date(a.date).getTime() : 0;
-    const dateB = b.date ? new Date(b.date).getTime() : 0;
-    return dateB - dateA;
-  });
+  const res = await fetch(`${API_BASE}/reviews/${productId}`);
+  if (!res.ok) throw new Error('Failed to fetch reviews');
+  return res.json();
 }
