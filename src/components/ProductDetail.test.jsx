@@ -12,7 +12,22 @@ vi.mock('../hooks/useCart', () => ({
 }));
 
 vi.mock('../hooks/useFadeIn', () => ({
-  useFadeIn: () => true // Always return true so the component is visible in tests
+  useFadeIn: () => true
+}));
+
+const mockUseUser = vi.hoisted(() => vi.fn().mockReturnValue({ user: null }));
+vi.mock('../hooks/useUser', () => ({
+  useUser: mockUseUser
+}));
+
+vi.mock('../services/reviews', () => ({
+  addReview: vi.fn(),
+  getProductReviews: vi.fn().mockResolvedValue([])
+}));
+
+const mockUseStore = vi.hoisted(() => vi.fn());
+vi.mock('../store/useStore', () => ({
+  useStore: mockUseStore
 }));
 
 vi.mock('../utils.js', () => ({
@@ -50,10 +65,28 @@ describe('ProductDetail Component', () => {
   const mockAddToCart = vi.fn();
   const mockNavigate = vi.fn();
 
+  const mockProducts = [
+    {
+      id: '1',
+      name: 'Royal Rajputana Poshak',
+      price: 15000,
+      originalPrice: 18000,
+      description: 'A stunning traditional poshak.',
+      image: 'poshak.jpg',
+      rating: 4.5,
+      reviews: 128,
+      category: 'Women'
+    }
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
     useCart.mockReturnValue({ addToCart: mockAddToCart });
     ReactRouter.useNavigate.mockReturnValue(mockNavigate);
+    mockUseUser.mockReturnValue({ user: null });
+    mockUseStore.mockImplementation((selector) =>
+      selector({ products: mockProducts })
+    );
   });
 
   afterEach(() => {
@@ -94,9 +127,9 @@ describe('ProductDetail Component', () => {
       expect(screen.getByText('₹18000')).toBeInTheDocument();
     });
 
-    it('displays the number of reviews', () => {
+    it('displays the number of reviews', async () => {
       renderComponent();
-      expect(screen.getByText('(128 reviews)')).toBeInTheDocument();
+      expect(await screen.findByText(/0 reviews/)).toBeInTheDocument();
     });
 
     it('sets the document title to the product name for SEO', () => {
