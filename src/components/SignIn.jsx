@@ -4,6 +4,14 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
+function tryFirebaseSignIn(email, password) {
+  import('../firebase').then(({ auth }) => {
+    if (!auth) return;
+    import('firebase/auth').then(({ signInWithEmailAndPassword }) => {
+      signInWithEmailAndPassword(auth, email, password).catch(() => {});
+    }).catch(() => {});
+  }).catch(() => {});
+}
 
 const RoyalLotus = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -21,7 +29,6 @@ const SignIn = () => {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const isVisible = useFadeIn();
@@ -51,10 +58,6 @@ const SignIn = () => {
       }
     }
 
-    if (!agreeTerms) {
-      newErrors.agreeTerms = 'You must agree to the terms and conditions to sign in.';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -65,6 +68,9 @@ const SignIn = () => {
       showAlert('Please fix the form errors before signing in.', 'warning');
       return;
     }
+
+    tryFirebaseSignIn(email, password);
+
     const userName = email.split('@')[0];
     login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
     showAlert('Signed in successfully! Welcome back.', 'success');
@@ -164,30 +170,6 @@ const SignIn = () => {
                   <p className="text-rose-800 text-xs font-medium leading-tight">{errors.password}</p>
                 </div>
               )}
-              </div>
-
-              <div className="flex flex-col">
-                <div className="flex items-center">
-                  <input
-                    id="terms"
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={(e) => {
-                      setAgreeTerms(e.target.checked);
-                      if (errors.agreeTerms) setErrors({ ...errors, agreeTerms: null });
-                    }}
-                    className="w-4 h-4 border-gray-300 rounded cursor-pointer accent-amber-500"
-                  />
-                  <label htmlFor="terms" className="ml-2 text-sm text-gray-600 cursor-pointer">
-                    I agree to the <Link to="/terms" className="text-amber-600 hover:underline" target="_blank">Terms and Conditions</Link>
-                  </label>
-                </div>
-                {errors.agreeTerms && (
-                  <div className="flex items-start gap-2 mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-md shadow-sm">
-                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-rose-800 text-xs font-medium leading-tight">{errors.agreeTerms}</p>
-                  </div>
-                )}
               </div>
 
               <button

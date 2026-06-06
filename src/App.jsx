@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy, useMemo } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useMemo, useCallback } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -19,6 +19,7 @@ import { useUser } from './hooks/useUser';
 import { useCart } from './hooks/useCart';
 import { useStore } from './store/useStore';
 
+
 const RoyalLotus = ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M12 22s-8-4.5-8-11.8A6 6 0 0 1 10 4.3" />
@@ -31,6 +32,9 @@ const RoyalLotus = ({ className }) => (
 
 export default function App() {
     const { user, logout } = useUser();
+    const handleLogout = useCallback(() => {
+      logout();
+    }, [logout]);
     const { cart, isCartOpen, setIsCartOpen, toastMessage, hideToast } = useCart();
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -57,7 +61,11 @@ export default function App() {
 
     useEffect(() => {
       fetch('http://localhost:3001/api/products')
-        .then(res => { if (res.ok) setServerConnected(true); })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          useStore.getState().syncProducts(data);
+          setServerConnected(true);
+        })
         .catch(() => { /* server not available */ });
     }, [setServerConnected]);
 
@@ -156,7 +164,7 @@ export default function App() {
                             {user ? (
                                 <div className="hidden sm:block cursor-pointer hover:border-amber-400 border border-transparent p-1 rounded transition-colors">
                                     <Link to="/account" className="text-xs text-rose-200">Hello, {user.name}</Link>
-                                    <button className="text-sm font-bold flex items-center gap-1" onClick={logout}>Logout</button>
+                                    <button className="text-sm font-bold flex items-center gap-1" onClick={handleLogout}>Logout</button>
                                 </div>
                             ) : (
                                 <Link to="/signin" className="hidden sm:block cursor-pointer hover:border-amber-400 border border-transparent p-1 rounded transition-colors">
@@ -201,7 +209,7 @@ export default function App() {
                             )}
                             <li className="border-t border-rose-800 pt-4">
                                 {user ? (
-                                    <button onClick={() => { logout(); setIsMobileMenuOpen(false); }} className="w-full text-left">Logout</button>
+                                    <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full text-left">Logout</button>
                                 ) : (
                                     <Link to="/signin" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
                                 )}

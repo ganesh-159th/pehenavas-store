@@ -5,6 +5,9 @@ import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X,
 import { useStore } from '../store/useStore';
 import { showAlert } from '../utils/alert';
 import { adminApi } from '../services/api';
+import { formatINR } from '../utils';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 
 const mockOrders = [
   {id: '#ORD-7352', name: 'Priya Sharma', item: 'Royal Silk Sherwani', status: 'Pending Packaging', color: 'bg-amber-100 text-amber-800 border-amber-200', amount: '₹12,499'},
@@ -53,20 +56,18 @@ export default function AdminDashboard() {
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
-      }
-      setImagePreview(URL.createObjectURL(e.target.files[0]));
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImagePreview(event.target.result);
+      };
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
   const handleCloseModal = () => {
     setShowAddModal(false);
     reset();
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-      setImagePreview('');
-    }
+    setImagePreview('');
   };
 
   useEffect(() => {
@@ -88,8 +89,9 @@ export default function AdminDashboard() {
     }
   }, [isSearchOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     adminLogout();
+    try { if (auth) await signOut(auth); } catch { /* Firebase not available */ }
     navigate('/admin/login');
   };
 
@@ -110,12 +112,22 @@ export default function AdminDashboard() {
       return;
     }
 
-    addProduct({ ...data, price, stock, image: imagePreview });
+    const productData = {
+      name: data.name.trim(),
+      price,
+      description: data.description || '',
+      category: data.category || 'Uncategorized',
+      stock,
+      image: imagePreview || '',
+      colors: [],
+    };
 
     try {
-      await adminApi.addProduct({ name: data.name, price, description: data.description, stock, category: data.category });
+      const saved = await adminApi.addProduct(productData);
+      addProduct(saved);
     } catch {
-      // Server sync is best-effort
+      showAlert('Failed to save product to server. Check server connection.', 'danger');
+      return;
     }
 
     reset();
@@ -183,7 +195,7 @@ export default function AdminDashboard() {
               </div>
             <div>
               <label className="block text-sm font-bold text-rose-950 mb-1">Product Photo</label>
-              <input required type="file" accept="image/*" {...register('imageFile', { required: true, onChange: handleImageChange })} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 transition-all border-2 border-gray-200 rounded-xl p-2 bg-white cursor-pointer" />
+              <input type="file" accept="image/*" {...register('imageFile', { onChange: handleImageChange })} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 transition-all border-2 border-gray-200 rounded-xl p-2 bg-white cursor-pointer" />
             </div>
               <button type="submit" className="w-full bg-amber-500 text-rose-950 font-bold py-3 mt-2 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md">Save Product</button>
             </form>
@@ -344,7 +356,7 @@ export default function AdminDashboard() {
                               </div>
                               <div className="p-3">
                                 <h4 className="font-semibold text-sm line-clamp-2 group-hover:text-amber-600 transition-colors">{product.name}</h4>
-                                <p className="text-amber-600 font-bold text-sm">₹{product.price.toLocaleString('en-IN')}</p>
+                                <p className="text-amber-600 font-bold text-sm">{formatINR(product.price)}</p>
                                 <p className="text-xs text-rose-900/60 mt-1">{product.category}</p>
                               </div>
                             </div>
@@ -405,7 +417,7 @@ export default function AdminDashboard() {
                   <div key={idx} className="w-full bg-rose-50 rounded-t-md relative group h-full flex items-end">
                     <div className="w-full bg-amber-400 rounded-t-md group-hover:bg-amber-500 transition-all duration-300 relative" style={{ height: `${val}%` }}>
                       <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-rose-950 text-white text-xs font-bold py-1.5 px-2.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-lg">
-                        ₹{(val * 1234).toLocaleString('en-IN')}
+                        {formatINR(val * 1234)}
                       </div>
                     </div>
                   </div>
@@ -470,7 +482,7 @@ export default function AdminDashboard() {
                     <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">{product.category}</div>
                     <h4 className="font-bold text-rose-950 truncate text-lg mb-1">{product.name}</h4>
                     <div className="flex justify-between items-end mt-3">
-                       <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
+                       <span className="text-xl font-bold text-rose-950 font-serif">{formatINR(product.price)}</span>
                        <div className="flex space-x-1">
                           <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
                           <button onClick={async () => {
@@ -571,7 +583,7 @@ export default function AdminDashboard() {
                     <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">{product.category}</div>
                     <h4 className="font-bold text-rose-950 truncate text-lg mb-1">{product.name}</h4>
                     <div className="flex justify-between items-end mt-3">
-                       <span className="text-xl font-bold text-rose-950 font-serif">₹{product.price.toLocaleString('en-IN')}</span>
+                       <span className="text-xl font-bold text-rose-950 font-serif">{formatINR(product.price)}</span>
                        <div className="flex space-x-1">
                           <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
                           <button onClick={async () => {

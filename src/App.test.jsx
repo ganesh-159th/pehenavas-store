@@ -20,7 +20,10 @@ vi.mock('./utils.js', () => ({
   formatINR: (amount) => `₹${amount}`
 }));
 
-// 3. Mock window.scrollTo since jsdom (the simulated browser) doesn't implement it
+// 3. Mock fetch to prevent real network calls
+globalThis.fetch = vi.fn(() => Promise.reject(new Error('fetch not available')));
+
+// 4. Mock window.scrollTo since jsdom (the simulated browser) doesn't implement it
 window.scrollTo = vi.fn();
 
 describe('App Integration', () => {

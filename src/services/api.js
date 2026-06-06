@@ -20,6 +20,19 @@ export const adminApi = {
     return res.json();
   },
 
+  async updateProduct(id, product) {
+    const res = await fetch(`${API_BASE}/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(product),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update product');
+    }
+    return res.json();
+  },
+
   async removeProduct(id) {
     const res = await fetch(`${API_BASE}/products/remove/${id}`, {
       method: 'DELETE',

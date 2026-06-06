@@ -28,13 +28,17 @@ export const useStore = create(
       addProduct: (product) => set((state) => ({
         products: [{
           ...product,
-          id: Date.now().toString(),
+          id: product.id ?? Date.now().toString(),
           rating: product.rating ?? 0,
           reviews: product.reviews ?? 0,
           originalPrice: product.originalPrice ?? product.price,
           colors: product.colors ?? [],
           description: product.description ?? '',
         }, ...state.products]
+      })),
+
+      updateProduct: (updated) => set((state) => ({
+        products: state.products.map(p => String(p.id) === String(updated.id) ? { ...p, ...updated } : p),
       })),
 
       removeProduct: (id) => {
