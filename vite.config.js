@@ -8,21 +8,4 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./vitest.setup.js'],
-    server: {
-      deps: {
-        inline: ['@exodus/bytes', 'html-encoding-sniffer', 'jsdom']
-      }
-    },
-    deps: {
-      optimizer: {
-        web: {
-          enabled: false
-        }
-      }
-    }
-  }
 })

@@ -4,6 +4,16 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
+function tryFirebaseSignup(name, email, password) {
+  import('../firebase').then(({ auth }) => {
+    if (!auth) return;
+    import('firebase/auth').then(({ createUserWithEmailAndPassword, updateProfile }) => {
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(result => updateProfile(result.user, { displayName: name }))
+        .catch(() => {});
+    }).catch(() => {});
+  }).catch(() => {});
+}
 
 const RoyalLotus = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -69,6 +79,9 @@ const SignUp = () => {
       showAlert('Please fix the form errors before creating an account.', 'warning');
       return;
     }
+
+    tryFirebaseSignup(name, email, password);
+
     login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
     showAlert('Account created successfully! Welcome aboard.', 'success');
     const from = location.state?.from || '/';

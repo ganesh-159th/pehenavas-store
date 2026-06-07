@@ -12,23 +12,52 @@ const db = admin.firestore();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-let products = [
+const SEED_PRODUCTS = [
   { id: 1, name: 'Royal Silk Sherwani', price: 12499, description: 'Luxurious silk sherwani for weddings.', category: 'Men', image: '', stock: 50, colors: ['Ivory', 'Gold'] },
-  { id: 2, name: 'Classic White Kurta', price: 2999, description: 'Comfortable cotton kurta.', category: 'Men', image: '', stock: 100, colors: ['White', 'Beige'] },
-  { id: 3, name: 'Velvet Bandhgala', price: 8999, description: 'Elegant velvet bandhgala jacket.', category: 'Men', image: '', stock: 30, colors: ['Black', 'Maroon'] },
-  { id: 4, name: 'Embroidered Lehenga', price: 14999, description: 'Beautiful embroidered bridal lehenga.', category: 'Women', image: '', stock: 20, colors: ['Red', 'Pink', 'Gold'] },
 ];
 
-let nextId = 100;
+async function seedIfEmpty() {
+  const snapshot = await db.collection('products').get();
+  if (!snapshot.empty) return;
+  const batch = db.batch();
+  for (const p of SEED_PRODUCTS) {
+    const ref = db.collection('products').doc(String(p.id));
+    batch.set(ref, p);
+  }
+  await batch.commit();
+  console.log(`[DB] 🌱 Seeded ${SEED_PRODUCTS.length} initial products`);
+}
 
-app.get('/api/products', (_req, res) => {
-  console.log('[ADMIN ACTION] 📋 FETCH: Products list retrieved');
-  res.json(products);
+async function getNextId() {
+  const counterRef = db.collection('meta').doc('counters');
+  const doc = await counterRef.get();
+  let next;
+  if (!doc.exists) {
+    const snapshot = await db.collection('products').get();
+    const maxId = snapshot.docs.reduce((max, d) => Math.max(max, d.data().id || 0), 0);
+    next = Math.max(maxId + 1, 100);
+  } else {
+    next = (doc.data().nextId || 100);
+  }
+  await counterRef.set({ nextId: next + 1 }, { merge: true });
+  return next;
+}
+
+app.get('/api/products', async (_req, res) => {
+  try {
+    const snapshot = await db.collection('products').orderBy('id', 'asc').get();
+    const products = snapshot.docs.map(d => d.data());
+    console.log('[ADMIN ACTION] 📋 FETCH: Products list retrieved');
+    res.json(products);
+  } catch (err) {
+    console.error('[ADMIN ACTION] 🔴 FETCH error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
 });
 
-app.post('/api/products/add', (req, res) => {
+app.post('/api/products/add', async (req, res) => {
   const { name, price, description, category, image, stock, colors } = req.body;
 
   if (!name || !name.trim()) {
@@ -40,19 +69,26 @@ app.post('/api/products/add', (req, res) => {
     return res.status(400).json({ error: 'Price must be a positive number' });
   }
 
+  const id = await getNextId();
   const product = {
-    id: nextId++,
+    id,
     name: name.trim(),
     price: Number(price),
     description: description || '',
     category: category || 'Uncategorized',
     image: image || '',
     stock: stock != null ? Number(stock) : 0,
-    colors: colors || []
+    colors: colors || [],
   };
-  products.push(product);
-  console.log(`[ADMIN ACTION] 🟢 SUCCESS: Product "${product.name}" added (₹${product.price})`);
-  res.status(201).json(product);
+
+  try {
+    await db.collection('products').doc(String(id)).set(product);
+    console.log(`[ADMIN ACTION] 🟢 SUCCESS: Product "${product.name}" added (₹${product.price})`);
+    res.status(201).json(product);
+  } catch (err) {
+    console.error('[ADMIN ACTION] 🔴 ADD error:', err.message);
+    res.status(500).json({ error: 'Failed to add product' });
+  }
 });
 
 app.get('/api/reviews/:productId', async (req, res) => {
@@ -93,24 +129,72 @@ app.post('/api/reviews', async (req, res) => {
   }
 });
 
-app.delete('/api/products/remove/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const idx = products.findIndex((p) => p.id === id);
-
-  if (idx === -1) {
-    console.log(`[ADMIN ACTION] 🔴 ALERT: Product #${id} not found`);
-    return res.status(404).json({ error: 'Product not found' });
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const doc = await db.collection('products').doc(String(id)).get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json(doc.data());
+  } catch (err) {
+    console.error('[ADMIN ACTION] 🔴 FETCH error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch product' });
   }
+});
 
-  const [removed] = products.splice(idx, 1);
-  console.log(`[ADMIN ACTION] 🔴 ALERT: Product "${removed.name}" removed (ID: ${removed.id})`);
-  res.json({ success: true, removed });
+app.put('/api/products/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const doc = await db.collection('products').doc(String(id)).get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const { name, price, description, category, image, stock, colors } = req.body;
+    const updated = {
+      id,
+      name: name?.trim() || doc.data().name,
+      price: price != null ? Number(price) : doc.data().price,
+      description: description ?? doc.data().description,
+      category: category || doc.data().category,
+      image: image ?? doc.data().image,
+      stock: stock != null ? Number(stock) : doc.data().stock,
+      colors: colors || doc.data().colors,
+    };
+    await db.collection('products').doc(String(id)).set(updated);
+    console.log(`[ADMIN ACTION] 🟢 UPDATED: Product #${id} "${updated.name}"`);
+    res.json(updated);
+  } catch (err) {
+    console.error('[ADMIN ACTION] 🔴 UPDATE error:', err.message);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+app.delete('/api/products/remove/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const doc = await db.collection('products').doc(String(id)).get();
+    if (!doc.exists) {
+      console.log(`[ADMIN ACTION] 🔴 ALERT: Product #${id} not found`);
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const removed = doc.data();
+    await db.collection('products').doc(String(id)).delete();
+    console.log(`[ADMIN ACTION] 🔴 ALERT: Product "${removed.name}" removed (ID: ${removed.id})`);
+    res.json({ success: true, removed });
+  } catch (err) {
+    console.error('[ADMIN ACTION] 🔴 DELETE error:', err.message);
+    res.status(500).json({ error: 'Failed to remove product' });
+  }
 });
 
 const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`\n╔══════════════════════════════════════════╗`);
-  console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
-  console.log(`║   http://localhost:${PORT}/api/products  ║`);
-  console.log(`╚══════════════════════════════════════════╝\n`);
+seedIfEmpty().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n╔══════════════════════════════════════════╗`);
+    console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
+    console.log(`║   http://localhost:${PORT}/api/products  ║`);
+    console.log(`╚══════════════════════════════════════════╝\n`);
+  });
 });

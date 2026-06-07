@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, Store, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('admin');
@@ -20,10 +22,9 @@ export default function AdminLogin() {
   const { adminLogin } = useStore();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Client-side validation
     if (!username.trim() || !password.trim()) {
       setError('Please enter both username and password.');
       return;
@@ -31,8 +32,17 @@ export default function AdminLogin() {
 
     setIsLoading(true);
     setError('');
-    
-    // Simulate slight delay for better UX
+
+    try {
+      if (auth) {
+        const email = username.includes('@') ? username : `${username}@pehenavas.com`;
+        await signInWithEmailAndPassword(auth, email, password);
+        adminLogin(username, password);
+        navigate('/admin/dashboard');
+        return;
+      }
+    } catch { /* Firebase unavailable or user not created — fall through */ }
+
     setTimeout(() => {
       const success = adminLogin(username, password);
       if (success) {
@@ -79,7 +89,7 @@ export default function AdminLogin() {
             
             {/* Username */}
             <div className="space-y-1.5">
-              <label htmlFor="username" className="block text-sm font-bold text-rose-950">Username</label>
+              <label htmlFor="username" className="block text-sm font-bold text-rose-950">Admin Username</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-amber-500 transition-colors">
                   <User className="h-5 w-5" strokeWidth={2} />
@@ -92,7 +102,7 @@ export default function AdminLogin() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="block w-full pl-10 pr-4 py-3 sm:text-sm border-2 border-gray-200 rounded-xl bg-white hover:border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all duration-200 font-medium text-gray-900 placeholder-gray-400 shadow-sm"
-                  placeholder="Enter your username"
+                  placeholder="admin"
                 />
               </div>
             </div>
@@ -146,11 +156,7 @@ export default function AdminLogin() {
                   Remember me
                 </label>
               </div>
-              <div className="text-sm">
-                <a href="#" className="font-bold text-amber-600 hover:text-amber-500 transition-colors">
-                  Forgot password?
-                </a>
-              </div>
+
             </div>
 
             {/* Submit Button */}
@@ -178,7 +184,7 @@ export default function AdminLogin() {
         <div className="mt-8 text-center">
           <div className="inline-flex items-center justify-center gap-1.5 mb-2 bg-amber-100 text-amber-800 py-1.5 px-3 rounded-md text-xs font-bold border border-amber-200 shadow-sm">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Using Default Test Credentials</span>
+            <span>Default: admin / admin123</span>
           </div>
           <p className="text-xs font-bold text-rose-900/40 uppercase tracking-widest">
             &copy; {new Date().getFullYear()} Pehenavas Admin.
