@@ -55,3 +55,153 @@ For detailed local environment setup, available scripts, and troubleshooting, pl
 - **E2E Tests:** `npm run cypress:open`
 - **Linting:** `npm run lint`
 - **Production Build:** `npm run build`
+
+---
+
+## 🏗️ UI Architecture — Component Hierarchy
+
+```
+main.jsx
+│
+└── <BrowserRouter>
+      │
+      └── <UserProvider>  ← Auth context (user, login, logout)
+            │
+            └── <ErrorBoundary>
+                  │
+                  └── <App>  ← Layout shell
+                        │
+                        ├── StickyHeader (nav, logo, search, cart icon, auth links)
+                        │
+                        ├── SearchModal (overlay)
+                        │
+                        ├── CartDrawer (slide-out)
+                        │
+                        ├── ConnectionBanner (server status indicator)
+                        │
+                        ├── ToastNotification (global alerts)
+                        │
+                        ├── <Routes>
+                        │     │
+                        │     ├── / → <Suspense> → <Home>
+                        │     │     ├── HeroBanner (3-slide carousel)
+                        │     │     ├── CategoryFilter (All, Men, Women, Jewellery, etc.)
+                        │     │     ├── PriceFilter (min/max range)
+                        │     │     ├── SortSelect (default, price, rating)
+                        │     │     └── ProductGrid
+                        │     │           └── ProductCard × N
+                        │     │                 └── QuickAddModal
+                        │     │
+                        │     ├── /signin → <SignIn> (email/password + Firebase auth)
+                        │     │
+                        │     ├── /signup → <SignUp> (name/email/password + terms)
+                        │     │
+                        │     ├── /account → <Account>
+                        │     │     └── <Orders>
+                        │     │           └── OrderCard × N
+                        │     │
+                        │     ├── /orders → <Orders>
+                        │     │
+                        │     ├── /product/:id → <Suspense> → <ProductDetail>
+                        │     │     ├── ProductImage gallery
+                        │     │     ├── SizeSelector
+                        │     │     ├── ColorSelector
+                        │     │     └── Reviews
+                        │     │           ├── ReviewList
+                        │     │           └── ReviewForm
+                        │     │
+                        │     ├── /checkout → <Checkout>
+                        │     │     ├── ShippingAddressForm
+                        │     │     ├── PaymentMethod (UPI / Card / COD)
+                        │     │     └── OrderSummary sidebar
+                        │     │
+                        │     ├── /wishlist → <Wishlist>
+                        │     │     └── ProductCard × N
+                        │     │
+                        │     ├── /admin/login → <AdminLogin>
+                        │     │
+                        │     ├── /admin/dashboard → <AdminDashboard>
+                        │     │     ├── Sidebar (Overview, Products, Orders, Customers)
+                        │     │     ├── Overview (chart, best-sellers, inventory)
+                        │     │     ├── Products (grid + AddProduct modal)
+                        │     │     ├── Orders (mock table)
+                        │     │     └── Customers (mock table + loyalty tiers)
+                        │     │
+                        │     ├── /terms → <Terms>
+                        │     │
+                        │     └── * → <NotFound>
+                        │
+                        └── Footer
+```
+
+### State Management Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Zustand (useStore.js) — persisted to localStorage          │
+│  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐ ┌──────┐│
+│  │ cart    │ │ wishlist │ │ orders  │ │ products │ │admin ││
+│  │ (items, │ │ (array)  │ │ (array) │ │ (merged  │ │auth  ││
+│  │  qty)   │ │          │ │         │ │  from    │ │      ││
+│  └─────────┘ └──────────┘ └─────────┘ │ server + │ └──────┘│
+│                                       │ local)   │          │
+│                                       └──────────┘          │
+│  Tab sync: listens to window.storage events                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│  React Context (UserContext.jsx) — persisted to localStorage │
+│  { user, login, logout } — synced with Firebase Auth        │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│  Component-local state                                      │
+│  useReducer → Home (filters, quick-view)                    │
+│  useState   → Checkout, SignIn, SignUp, ProductDetail etc.  │
+│  react-hook-form → AdminDashboard (AddProduct form)         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+User Action
+     │
+     ▼
+Component (event handler)
+     │
+     ├──→ Zustand action (addToCart, toggleWishlist, addOrder)
+     │       │
+     │       └──→ localStorage persist (survives refresh)
+     │
+     └──→ fetch() to Express API
+                 │
+                 └──→ Firebase Admin SDK
+                         │
+                         └──→ Firestore (products, reviews)
+```
+
+### Backend Overview
+
+```
+Express Server (server.js @ port 3001)
+│
+├── GET    /api/products              → List all products
+├── GET    /api/products/:id          → Get single product
+├── POST   /api/products/add          → Add product (auto-increment ID)
+├── PUT    /api/products/:id          → Update product
+├── DELETE /api/products/remove/:id   → Delete product
+├── GET    /api/reviews/:productId    → Get reviews
+└── POST   /api/reviews               → Submit review
+         │
+         └── Firestore collections: products, reviews, meta
+```
+
+### Key UI Patterns
+
+- **Lazy loading**: `Home` & `ProductDetail` via `React.lazy()` + `<Suspense>` — Firebase client dynamically imported
+- **Protected routes**: `/account`, `/orders`, `/checkout` redirect to `/signin` if unauthenticated; `/admin/dashboard` redirects to `/admin/login`
+- **Graceful degradation**: App falls back to local seed data (`src/data/products.js`) when server is offline — connection banner shown at top
+- **Error boundary**: `ErrorBoundary.jsx` catches render errors and shows a styled fallback page
+- **Animations**: `useFadeIn` hook + Tailwind transitions; CSS keyframes for cart drawer slide-in
+- **Toast system**: DOM-managed alerts via `src/utils/alert.js` (independent of React render cycle)
