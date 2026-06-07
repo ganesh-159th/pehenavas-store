@@ -2,17 +2,31 @@ import express from 'express';
 import cors from 'cors';
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-const serviceAccount = JSON.parse(
-  readFileSync('./pehenavas-db-firebase-adminsdk-fbsvc-db464a7991.json', 'utf-8')
-);
+const __filename = fileURLToPath(import.meta.url);
 
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+let db;
+
+function initFirebase() {
+  const serviceAccount = JSON.parse(
+    readFileSync('./pehenavas-db-firebase-adminsdk-fbsvc-db464a7991.json', 'utf-8')
+  );
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  db = admin.firestore();
+  return db;
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+export { app, initFirebase, db };
+
+export function setDb(instance) {
+  db = instance;
+}
 
 const SEED_PRODUCTS = [
   { id: 1, name: 'Royal Silk Sherwani', price: 12499, description: 'Luxurious silk sherwani for weddings.', category: 'Men', image: '', stock: 50, colors: ['Ivory', 'Gold'] },
@@ -190,11 +204,22 @@ app.delete('/api/products/remove/:id', async (req, res) => {
 });
 
 const PORT = 3001;
-seedIfEmpty().then(() => {
-  app.listen(PORT, () => {
-    console.log(`\n╔══════════════════════════════════════════╗`);
-    console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
-    console.log(`║   http://localhost:${PORT}/api/products  ║`);
-    console.log(`╚══════════════════════════════════════════╝\n`);
+
+function startServer() {
+  seedIfEmpty().then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n╔══════════════════════════════════════════╗`);
+      console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
+      console.log(`║   http://localhost:${PORT}/api/products  ║`);
+      console.log(`╚══════════════════════════════════════════╝\n`);
+    });
   });
-});
+}
+
+// Only start the server when run directly (not when imported in tests)
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
+  initFirebase();
+  startServer();
+}
+
+export { startServer };
