@@ -122,19 +122,23 @@ export default function AdminDashboard() {
       colors: [],
     };
 
-    try {
-      const saved = await adminApi.addProduct(productData);
-      addProduct(saved);
-    } catch {
-      showAlert('Failed to save product to server. Check server connection.', 'danger');
-      return;
-    }
+    // Add locally immediately so the UI updates right away
+    const localProduct = { ...productData, id: Date.now().toString() };
+    addProduct(localProduct);
 
     reset();
     setImagePreview('');
     setShowAddModal(false);
-
     showAlert('Product added successfully!', 'success');
+
+    // Sync to server in the background (non-blocking)
+    adminApi.addProduct(productData)
+      .then((saved) => {
+        useStore.getState().updateProduct(saved);
+      })
+      .catch(() => {
+        showAlert('Saved locally but could not sync to server.', 'warning');
+      });
   };
 
   const filteredProducts = products.filter(product =>
