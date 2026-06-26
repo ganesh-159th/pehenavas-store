@@ -8,6 +8,36 @@ npm --version     # Should be v10.0+
 
 ---
 
+## Docker Setup (Alternative — No Manual Installation Needed)
+
+Run the entire project in containers without installing Node, npm, or any dependencies on your machine.
+
+### 1. Install Docker Desktop
+Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) and launch it.
+
+### 2. Build & Start
+```bash
+cd /path/to/pehenavas-store
+docker compose up --build
+```
+
+### 3. Open in Browser
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:3001/api/products
+
+### Live Reload
+- Edit frontend files → saved changes auto-refresh in the browser
+- Edit `server.js` → backend auto-restarts via `--watch`
+
+### Useful Commands
+```bash
+docker compose up          # Start (skip build)
+docker compose down        # Stop containers
+docker compose up --build  # Rebuild after package.json changes
+```
+
+---
+
 ## Step 1: Install Project Dependencies
 
 ```bash
