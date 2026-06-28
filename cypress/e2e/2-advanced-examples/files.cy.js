@@ -2,7 +2,6 @@
 
 /// JSON fixture file can be loaded directly using
 // the built-in JavaScript bundler
-/* global require */
 const requiredExample = require('../../fixtures/example')
 
 context('Files', () => {

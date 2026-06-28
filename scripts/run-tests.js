@@ -96,5 +96,4 @@ const result = spawnSync('npx', ['vitest', '--run', '--reporter=verbose'], {
 });
 
 printSummary(result.status, startTime);
-// eslint-disable-next-line no-undef
 process.exit(result.status ?? 1);
