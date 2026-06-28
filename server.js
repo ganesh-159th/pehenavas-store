@@ -1,11 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import 'dotenv/config';
 import admin from 'firebase-admin';
-import { readFileSync } from 'fs';
 
-const serviceAccount = JSON.parse(
-  readFileSync('./pehenavas-db-firebase-adminsdk-fbsvc-db464a7991.json', 'utf-8')
-);
+const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
+if (!b64) {
+  console.error('FIREBASE_SERVICE_ACCOUNT_B64 environment variable is required');
+  process.exit(1);
+}
+const serviceAccount = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();

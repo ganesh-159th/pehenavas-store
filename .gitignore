@@ -23,5 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment files (contain secrets - DO NOT COMMIT)
+.env
+
 # Firebase service account (contains private key - DO NOT COMMIT)
 pehenavas-db-firebase-adminsdk-*.json

@@ -26,3 +26,4 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
+      - FIREBASE_SERVICE_ACCOUNT_B64=${FIREBASE_SERVICE_ACCOUNT_B64}
