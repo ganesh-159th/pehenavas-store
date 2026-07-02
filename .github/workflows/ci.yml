@@ -33,10 +33,10 @@ jobs:
     - name: 🛠️ Verify Application Build
       run: npm run build
 
-    - name: 🧪 Run Vitest Unit Tests
+    - name: 🧪 Run Vitest Unit Tests (with coverage)
       env:
         NODE_OPTIONS: "--max-old-space-size=4096"
-      run: npx vitest run
+      run: npx vitest run --coverage
 
     - name: 🌲 Run Cypress E2E Tests
       run: npx start-server-and-test 'npm run dev' http://localhost:3000 'npx cypress run'
