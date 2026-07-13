@@ -98,20 +98,24 @@ const SignIn = () => {
 
     setResetLoading(true);
     try {
-      const { auth } = await import('../firebase');
-      if (!auth) throw new Error('Firebase not initialized');
-      const { sendPasswordResetEmail } = await import('firebase/auth');
-      await sendPasswordResetEmail(auth, resetEmail);
+      const res = await fetch('http://localhost:3001/api/auth/send-reset-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 404) {
+          setResetError('No account found with this email.');
+        } else {
+          setResetError(data.error || 'Failed to send reset email. Please try again.');
+        }
+        return;
+      }
       setResetSent(true);
       showAlert('Password reset email sent! Check your inbox.', 'success');
-    } catch (err) {
-      if (err.code === 'auth/user-not-found') {
-        setResetError('No account found with this email.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setResetError('Too many attempts. Please try again later.');
-      } else {
-        setResetError('Failed to send reset email. Please try again.');
-      }
+    } catch {
+      setResetError('Failed to connect to server. Please try again.');
     } finally {
       setResetLoading(false);
     }

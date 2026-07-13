@@ -14,6 +14,7 @@ import Wishlist from './components/Wishlist';
 import AdminLogin from './admin/AdminLogin';
 import AdminDashboard from './admin/AdminDashboard';
 import Terms from './components/Terms';
+import ResetPassword from './components/ResetPassword';
 import NotFound from './components/NotFound';
 import { useUser } from './hooks/useUser';
 import { useCart } from './hooks/useCart';
@@ -334,6 +335,7 @@ export default function App() {
                         <Route path="/admin/login" element={<AdminLogin />} />
                         <Route path="/admin/dashboard" element={<AdminDashboard />} />
                         <Route path="/terms" element={<Terms />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </Suspense>

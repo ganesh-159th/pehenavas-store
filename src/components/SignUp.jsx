@@ -73,7 +73,7 @@ const SignUp = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     if (!validate()) {
       showAlert('Please fix the form errors before creating an account.', 'warning');
@@ -81,6 +81,16 @@ const SignUp = () => {
     }
 
     tryFirebaseSignup(name, email, password);
+
+    try {
+      await fetch('http://localhost:3001/api/auth/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name }),
+      });
+    } catch {
+      // Silently fail — welcome email is non-critical
+    }
 
     login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
     showAlert('Account created successfully! Welcome aboard.', 'success');
