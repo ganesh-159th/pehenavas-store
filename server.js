@@ -3,7 +3,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
-import { passwordReset, emailVerification, welcomeEmail } from './server/emailTemplates.js';
+import { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived } from './server/emailTemplates.js';
 
 const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
 if (!b64) {
@@ -36,6 +36,8 @@ function getRecipient(to, type) {
     welcome: process.env.EMAIL_OVERRIDE_WELCOME,
     reset: process.env.EMAIL_OVERRIDE_RESET,
     verify: process.env.EMAIL_OVERRIDE_VERIFY,
+    support: process.env.EMAIL_OVERRIDE_SUPPORT,
+    feedback: process.env.EMAIL_OVERRIDE_FEEDBACK,
   };
   return overrides[type] || process.env.EMAIL_OVERRIDE || to;
 }
@@ -292,6 +294,28 @@ app.post('/api/auth/send-welcome-email', async (req, res) => {
   }
 
   const sent = await sendEmail(email, welcomeEmail(name || email.split('@')[0]), 'welcome');
+  res.json({ success: true, emailSent: sent });
+});
+
+app.post('/api/auth/send-support-email', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'Name, email, subject, and message are required' });
+  }
+
+  const sent = await sendEmail(email, supportRequest(name, email, subject, message), 'support');
+  console.log(`[SUPPORT] 📩 Support request from ${name} (${email}): ${subject}`);
+  res.json({ success: true, emailSent: sent });
+});
+
+app.post('/api/auth/send-feedback-email', async (req, res) => {
+  const { name, email, rating, category, message } = req.body;
+  if (!name || !email || !rating || !category || !message) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  const sent = await sendEmail(email, feedbackReceived(name, Number(rating), category, message), 'feedback');
+  console.log(`[FEEDBACK] ⭐ Feedback from ${name} (${email}): ${rating}/5 — ${category}`);
   res.json({ success: true, emailSent: sent });
 });
 
