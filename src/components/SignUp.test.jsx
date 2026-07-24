@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SignUp from './SignUp';
 import { useUser } from '../hooks/useUser';
@@ -131,7 +131,9 @@ describe('SignUp Component', () => {
   });
 
   describe('Successful Registration', () => {
-    it('calls login and navigates to home when registration is fully valid', () => {
+    it('calls login and navigates to home when registration is fully valid', async () => {
+      global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+      
       renderComponent();
       
       // Fill out valid data
@@ -144,15 +146,14 @@ describe('SignUp Component', () => {
       // Submit
       fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
       
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
+        expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+      });
+      
       // Should not show any errors
       expect(screen.queryByText('Full name is required.')).not.toBeInTheDocument();
       expect(screen.queryByText(/Password must be at least 8 characters/i)).not.toBeInTheDocument();
-      
-      // Should capitalize the first letter of the name!
-      expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
-      
-      // Should navigate to Home
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 });
