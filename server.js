@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import admin from 'firebase-admin';
+import nodemailer from 'nodemailer';
+import { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived } from './server/emailTemplates.js';
 
 const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
 if (!b64) {
@@ -12,6 +14,55 @@ const serviceAccount = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
+
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
+
+let mailer = null;
+if (EMAIL_USER && EMAIL_PASS) {
+  mailer = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+  });
+  console.log('[EMAIL] ✉️  Gmail SMTP configured');
+} else {
+  console.log('[EMAIL] ⚠️  Email not configured (set EMAIL_USER and EMAIL_PASS in .env)');
+}
+
+function getRecipient(to, type) {
+  const overrides = {
+    welcome: process.env.EMAIL_OVERRIDE_WELCOME,
+    reset: process.env.EMAIL_OVERRIDE_RESET,
+    verify: process.env.EMAIL_OVERRIDE_VERIFY,
+    support: process.env.EMAIL_OVERRIDE_SUPPORT,
+    feedback: process.env.EMAIL_OVERRIDE_FEEDBACK,
+  };
+  return overrides[type] || process.env.EMAIL_OVERRIDE || to;
+}
+
+async function sendEmail(to, template, type = 'general') {
+  if (!mailer) {
+    console.log('[EMAIL] ⚠️  Skipping email — SMTP not configured');
+    return false;
+  }
+  const recipient = getRecipient(to, type);
+  try {
+    await mailer.sendMail({
+      from: `"Pehenavas" <${EMAIL_FROM}>`,
+      to: recipient,
+      subject: template.subject,
+      html: template.html,
+    });
+    const target = recipient !== to ? `${to} → ${recipient}` : recipient;
+    console.log(`[EMAIL] ✉️  Sent "${template.subject}" to ${target}`);
+    return true;
+  } catch (err) {
+    console.error('[EMAIL] 🔴 Failed to send email:', err.message);
+    return false;
+  }
+}
 
 const app = express();
 app.use(cors());
@@ -190,6 +241,82 @@ app.delete('/api/products/remove/:id', async (req, res) => {
     console.error('[ADMIN ACTION] 🔴 DELETE error:', err.message);
     res.status(500).json({ error: 'Failed to remove product' });
   }
+});
+
+app.post('/api/auth/send-reset-email', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const link = await admin.auth().generatePasswordResetLink(email, {
+      url: `${APP_URL}/reset-password`,
+      handleCodeInApp: true,
+    });
+    const sent = await sendEmail(email, passwordReset(email, link), 'reset');
+    res.json({ success: true, emailSent: sent });
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      return res.status(404).json({ error: 'No account found with this email' });
+    }
+    console.error('[AUTH] 🔴 Reset email error:', err.message);
+    res.status(500).json({ error: 'Failed to send reset email' });
+  }
+});
+
+app.post('/api/auth/send-verification-email', async (req, res) => {
+  const { email, name } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const link = await admin.auth().generateEmailVerificationLink(email, {
+      url: `${APP_URL}/signin`,
+      handleCodeInApp: true,
+    });
+    const sent = await sendEmail(email, emailVerification(name || email.split('@')[0], link), 'verify');
+    res.json({ success: true, emailSent: sent });
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      return res.status(404).json({ error: 'No account found with this email' });
+    }
+    console.error('[AUTH] 🔴 Verification email error:', err.message);
+    res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+app.post('/api/auth/send-welcome-email', async (req, res) => {
+  const { email, name } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const sent = await sendEmail(email, welcomeEmail(name || email.split('@')[0]), 'welcome');
+  res.json({ success: true, emailSent: sent });
+});
+
+app.post('/api/auth/send-support-email', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'Name, email, subject, and message are required' });
+  }
+
+  const sent = await sendEmail(email, supportRequest(name, email, subject, message), 'support');
+  console.log(`[SUPPORT] 📩 Support request from ${name} (${email}): ${subject}`);
+  res.json({ success: true, emailSent: sent });
+});
+
+app.post('/api/auth/send-feedback-email', async (req, res) => {
+  const { name, email, rating, category, message } = req.body;
+  if (!name || !email || !rating || !category || !message) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  const sent = await sendEmail(email, feedbackReceived(name, Number(rating), category, message), 'feedback');
+  console.log(`[FEEDBACK] ⭐ Feedback from ${name} (${email}): ${rating}/5 — ${category}`);
+  res.json({ success: true, emailSent: sent });
 });
 
 const PORT = 3001;
