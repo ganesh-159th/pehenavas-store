@@ -2,7 +2,6 @@ import React, { useState, useEffect, Suspense, lazy, useMemo, useCallback } from
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
-import { getApiBase } from './config';
 const Home = lazy(() => import('./components/Home'));
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp';
@@ -20,6 +19,7 @@ import NotFound from './components/NotFound';
 import { useUser } from './hooks/useUser';
 import { useCart } from './hooks/useCart';
 import { useStore } from './store/useStore';
+import { useRealtimeProducts } from './hooks/useRealtimeProducts';
 
 
 const RoyalLotus = ({ className }) => (
@@ -45,7 +45,8 @@ export default function App() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const { products, wishlist, serverConnected, setServerConnected } = useStore();
+    const { products, wishlist, serverConnected } = useStore();
+    useRealtimeProducts();
 
     useEffect(() => {
       const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -60,16 +61,6 @@ export default function App() {
             setTimeout(() => loader?.remove(), 400);
         }
     }, []);
-
-    useEffect(() => {
-      fetch(`${getApiBase()}/products`)
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => {
-          useStore.getState().syncProducts(data);
-          setServerConnected(true);
-        })
-        .catch(() => { /* server not available */ });
-    }, [setServerConnected]);
 
     const searchResults = useMemo(() => {
         if (debouncedSearch.trim() === "") {

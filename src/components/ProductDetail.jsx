@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Star, ArrowLeft, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatINR } from '../utils.js';
@@ -6,7 +6,8 @@ import { useCart } from '../hooks/useCart';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { useStore } from '../store/useStore';
 import { useUser } from '../hooks/useUser';
-import { addReview, getProductReviews, getReviewStats, updateReview, batchHelpfulStatus } from '../services/reviews';
+import { useRealtimeReviews } from '../hooks/useRealtimeReviews';
+import { addReview, updateReview, batchHelpfulStatus } from '../services/reviews';
 import RatingBreakdown from './RatingBreakdown';
 import ReviewCard from './ReviewCard';
 import ReviewForm from './ReviewForm';
@@ -23,67 +24,31 @@ const ProductDetail = () => {
     const storeProducts = useStore((state) => state.products);
     const [selectedSize, setSelectedSize] = useState('M');
     const [selectedColor, setSelectedColor] = useState(null);
-    const [reviews, setReviews] = useState([]);
-    const [stats, setStats] = useState(null);
     const [helpfulMap, setHelpfulMap] = useState({});
     const [sort, setSort] = useState('recent');
     const [submitting, setSubmitting] = useState(false);
-    const [loadingReviews, setLoadingReviews] = useState(true);
     const [editingReview, setEditingReview] = useState(null);
     const [visibleCount, setVisibleCount] = useState(REVIEWS_PER_PAGE);
     const [error, setError] = useState('');
     const [formKey, setFormKey] = useState(0);
 
     const product = storeProducts.find(p => String(p.id) === String(id));
-
-    const fetchReviews = useCallback(async () => {
-        if (!product) return;
-        try {
-            const [reviewsData, statsData] = await Promise.all([
-                getProductReviews(product.id, sort),
-                getReviewStats(product.id),
-            ]);
-            setReviews(reviewsData);
-            setStats(statsData);
-            if (user && reviewsData.length > 0) {
-                batchHelpfulStatus(reviewsData.map(r => r.id)).then(setHelpfulMap).catch(() => {});
-            }
-        } catch (err) {
-            void err;
-        } finally {
-            setLoadingReviews(false);
-        }
-    }, [product, sort, user]);
+    const { reviews, loading: loadingReviews } = useRealtimeReviews(product?.id, sort);
 
     useEffect(() => {
+        if (!user || reviews.length === 0) return;
         let cancelled = false;
-        async function load() {
-            if (!product) return;
-            setLoadingReviews(true);
-            setVisibleCount(REVIEWS_PER_PAGE);
-            try {
-                const [reviewsData, statsData] = await Promise.all([
-                    getProductReviews(product.id, sort),
-                    getReviewStats(product.id),
-                ]);
-                if (!cancelled) {
-                    setReviews(reviewsData);
-                    setStats(statsData);
-                    if (user && reviewsData.length > 0) {
-                        batchHelpfulStatus(reviewsData.map(r => r.id))
-                            .then(m => { if (!cancelled) setHelpfulMap(m); })
-                            .catch(() => {});
-                    }
-                }
-            } catch (err) {
-                void err;
-            } finally {
-                if (!cancelled) setLoadingReviews(false);
-            }
-        }
-        load();
+        batchHelpfulStatus(reviews.map(r => r.id))
+            .then(m => { if (!cancelled) setHelpfulMap(m); })
+            .catch(() => {});
         return () => { cancelled = true; };
-    }, [product, sort, user]);
+    }, [reviews, user]);
+
+    const stats = product ? {
+        averageRating: product.rating || 0,
+        totalReviews: product.reviews || 0,
+        distribution: product.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    } : null;
 
     const avgRating = stats?.averageRating ?? product?.rating ?? 0;
 
@@ -94,10 +59,10 @@ const ProductDetail = () => {
         try {
             await addReview({ productId: product.id, rating, comment });
             setFormKey(k => k + 1);
-            setSubmitting(false);
-            fetchReviews();
+            setVisibleCount(REVIEWS_PER_PAGE);
         } catch (err) {
             setError(err.message || 'Failed to submit review');
+        } finally {
             setSubmitting(false);
         }
     };
@@ -109,7 +74,6 @@ const ProductDetail = () => {
         try {
             await updateReview(editingReview.id, { rating, comment });
             setEditingReview(null);
-            await fetchReviews();
         } catch (err) {
             setError(err.message || 'Failed to update review');
         } finally {
@@ -118,7 +82,7 @@ const ProductDetail = () => {
     };
 
     const handleDeletedReview = () => {
-        fetchReviews();
+        setVisibleCount(REVIEWS_PER_PAGE);
     };
 
     useEffect(() => {
