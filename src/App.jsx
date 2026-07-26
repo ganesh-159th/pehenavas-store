@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy, useMemo, useCallback } from
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Search, Menu, Heart, Facebook, Instagram, Twitter, ArrowUp, CheckCircle2, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { getApiBase } from './config';
 const Home = lazy(() => import('./components/Home'));
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp';
@@ -61,7 +62,7 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-      fetch('http://localhost:3001/api/products')
+      fetch(`${getApiBase()}/products`)
         .then(res => res.ok ? res.json() : Promise.reject())
         .then(data => {
           useStore.getState().syncProducts(data);

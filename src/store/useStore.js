@@ -136,6 +136,12 @@ export const useStore = create(
         orders: [order, ...state.orders]
       })),
 
+      // Review Stats Cache
+      reviewStatsCache: {},
+      setReviewStats: (productId, stats) => set((state) => ({
+        reviewStatsCache: { ...state.reviewStatsCache, [String(productId)]: stats },
+      })),
+
       // Server Sync Status
       serverConnected: false,
       setServerConnected: (connected) => set({ serverConnected: connected }),

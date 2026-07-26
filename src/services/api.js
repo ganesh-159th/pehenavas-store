@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:3001/api';
+import { getApiBase } from '../config';
+const API_BASE = getApiBase();
 
 export const adminApi = {
   async getProducts() {

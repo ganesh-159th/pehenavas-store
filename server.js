@@ -27,6 +27,13 @@ if (EMAIL_USER && EMAIL_PASS) {
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
   });
   console.log('[EMAIL] ✉️  Gmail SMTP configured');
+  mailer.verify()
+    .then(() => console.log('[EMAIL] ✅ SMTP connection verified — emails will be sent to individual users'))
+    .catch(err => {
+      console.error('[EMAIL] ❌ SMTP verification failed:', err.message);
+      console.error('[EMAIL]    Emails will NOT be sent. Check EMAIL_USER and EMAIL_PASS in .env');
+      mailer = null;
+    });
 } else {
   console.log('[EMAIL] ⚠️  Email not configured (set EMAIL_USER and EMAIL_PASS in .env)');
 }
@@ -44,10 +51,14 @@ function getRecipient(to, type) {
 
 async function sendEmail(to, template, type = 'general') {
   if (!mailer) {
-    console.log('[EMAIL] ⚠️  Skipping email — SMTP not configured');
+    console.log(`[EMAIL] ⚠️  Skipping "${template.subject}" to ${to} — SMTP not configured`);
     return false;
   }
   const recipient = getRecipient(to, type);
+  const redirected = recipient !== to;
+  if (redirected) {
+    console.log(`[EMAIL] 🔄 Redirecting ${type} email: ${to} → ${recipient}`);
+  }
   try {
     await mailer.sendMail({
       from: `"Pehenavas" <${EMAIL_FROM}>`,
@@ -55,8 +66,7 @@ async function sendEmail(to, template, type = 'general') {
       subject: template.subject,
       html: template.html,
     });
-    const target = recipient !== to ? `${to} → ${recipient}` : recipient;
-    console.log(`[EMAIL] ✉️  Sent "${template.subject}" to ${target}`);
+    console.log(`[EMAIL] ✉️  Sent "${template.subject}" to ${recipient}`);
     return true;
   } catch (err) {
     console.error('[EMAIL] 🔴 Failed to send email:', err.message);
@@ -145,14 +155,118 @@ app.post('/api/products/add', async (req, res) => {
   }
 });
 
+// ── Auth middleware ──────────────────────────────────────────────────────────
+async function verifyToken(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    const decoded = await admin.auth().verifyIdToken(header.slice(7));
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+async function updateProductRating(productId, oldRating, newRating) {
+  const ref = db.collection('products').doc(String(productId));
+  const snap = await ref.get();
+  if (!snap.exists) return;
+
+  const data = snap.data();
+  const prevSum = data.ratingSum || 0;
+  const count = data.reviews || 0;
+
+  let sum = prevSum;
+  let total = count;
+  const dist = { ...(data.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }) };
+
+  if (oldRating != null) {
+    sum = sum - oldRating + (newRating || 0);
+    dist[oldRating] = Math.max(0, (dist[oldRating] || 0) - 1);
+    if (newRating) dist[newRating] = (dist[newRating] || 0) + 1;
+  } else if (newRating != null) {
+    sum += newRating;
+    total += 1;
+    dist[newRating] = (dist[newRating] || 0) + 1;
+  } else {
+    return;
+  }
+
+  const avg = total ? Math.round((sum / total) * 10) / 10 : 0;
+  await ref.set({
+    rating: avg,
+    reviews: total,
+    ratingSum: sum,
+    ratingDistribution: dist,
+  }, { merge: true });
+}
+
+async function removeProductRating(productId, oldRating) {
+  const ref = db.collection('products').doc(String(productId));
+  const snap = await ref.get();
+  if (!snap.exists) return;
+
+  const data = snap.data();
+  const prevSum = data.ratingSum || 0;
+  const count = data.reviews || 0;
+
+  const sum = prevSum - oldRating;
+  const total = Math.max(0, count - 1);
+  const dist = { ...(data.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }) };
+  dist[oldRating] = Math.max(0, (dist[oldRating] || 0) - 1);
+
+  const avg = total ? Math.round((sum / total) * 10) / 10 : 0;
+  await ref.set({
+    rating: avg,
+    reviews: total,
+    ratingSum: sum,
+    ratingDistribution: dist,
+  }, { merge: true });
+}
+
+async function recalcProductRating(productId) {
+  const ref = db.collection('products').doc(String(productId));
+  const snap = await ref.get();
+  if (snap.exists) {
+    const d = snap.data();
+    return {
+      averageRating: d.rating || 0,
+      totalReviews: d.reviews || 0,
+      distribution: d.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+  }
+  const reviewsSnap = await db.collection('reviews').where('productId', '==', String(productId)).get();
+  const reviews = reviewsSnap.docs.map(d => d.data());
+  const total = reviews.length;
+  const sum = reviews.reduce((s, r) => s + r.rating, 0);
+  const avg = total ? Math.round((sum / total) * 10) / 10 : 0;
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  reviews.forEach(r => { distribution[r.rating] = (distribution[r.rating] || 0) + 1; });
+  await ref.set({ rating: avg, reviews: total, ratingSum: sum, ratingDistribution: distribution }, { merge: true });
+  return { averageRating: avg, totalReviews: total, distribution };
+}
+
+// ── Reviews API ─────────────────────────────────────────────────────────────
+
 app.get('/api/reviews/:productId', async (req, res) => {
   try {
-    const productId = req.params.productId;
-    const snapshot = await db.collection('reviews')
+    const { productId } = req.params;
+    const { sort = 'recent' } = req.query;
+    let snapshot = await db.collection('reviews')
       .where('productId', '==', String(productId))
-      .orderBy('date', 'desc')
       .get();
-    const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    switch (sort) {
+      case 'highest':  reviews.sort((a, b) => b.rating - a.rating); break;
+      case 'lowest':   reviews.sort((a, b) => a.rating - b.rating); break;
+      case 'helpful':  reviews.sort((a, b) => (b.helpfulCount || 0) - (a.helpfulCount || 0)); break;
+      default:         reviews.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
     res.json(reviews);
   } catch (err) {
     console.error('[REVIEW] 🔴 Failed to fetch reviews:', err.message);
@@ -160,26 +274,221 @@ app.get('/api/reviews/:productId', async (req, res) => {
   }
 });
 
-app.post('/api/reviews', async (req, res) => {
-  const { productId, userId, userName, rating, comment } = req.body;
-  if (!productId || !userId || !rating || !comment?.trim()) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+app.get('/api/reviews/product/:productId/stats', async (req, res) => {
   try {
+    const stats = await recalcProductRating(req.params.productId);
+    res.json(stats);
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to fetch stats:', err.message);
+    res.status(500).json({ error: 'Failed to fetch review stats' });
+  }
+});
+
+app.get('/api/reviews/batch-helpful', verifyToken, async (req, res) => {
+  const { ids } = req.query;
+  const { uid } = req.user;
+  if (!ids) return res.json({});
+  try {
+    const reviewIds = ids.split(',');
+    const helpfulRefs = reviewIds.map(id =>
+      db.collection('review_helpful').doc(`${id}_${uid}`).get()
+    );
+    const helpfulSnaps = await Promise.all(helpfulRefs);
+    const result = {};
+    helpfulSnaps.forEach((snap, i) => {
+      result[reviewIds[i]] = snap.exists;
+    });
+    res.json(result);
+  } catch {
+    res.json({});
+  }
+});
+
+app.post('/api/reviews', verifyToken, async (req, res) => {
+  const { productId, rating, comment } = req.body;
+  const { uid } = req.user;
+
+  if (!productId || !rating || !comment?.trim()) {
+    return res.status(400).json({ error: 'productId, rating, and comment are required' });
+  }
+  const ratingNum = Number(rating);
+  if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
+  }
+  const trimmed = comment.trim();
+
+  try {
+    const userName = req.user.name || req.user.email?.split('@')[0] || 'Anonymous';
     const review = {
       productId: String(productId),
-      userId,
-      userName: userName || 'Anonymous',
-      rating: Number(rating),
-      comment: comment.trim(),
+      userId: uid,
+      userName,
+      rating: ratingNum,
+      comment: trimmed,
       date: new Date().toISOString(),
+      helpfulCount: 0,
     };
-    const docRef = await db.collection('reviews').add(review);
-    console.log(`[REVIEW] ⭐ Review added for product #${productId} (${review.rating}/5)`);
+    const [docRef] = await Promise.all([
+      db.collection('reviews').add(review),
+      updateProductRating(productId, null, ratingNum),
+    ]);
+
+    console.log(`[REVIEW] ⭐ Review added for product #${productId} (${ratingNum}/5) by ${userName}`);
     res.status(201).json({ id: docRef.id, ...review });
   } catch (err) {
     console.error('[REVIEW] 🔴 Failed to save review:', err.message);
     res.status(500).json({ error: 'Failed to save review' });
+  }
+});
+
+app.put('/api/reviews/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+  const { uid } = req.user;
+
+  try {
+    const doc = await db.collection('reviews').doc(id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Review not found' });
+    if (doc.data().userId !== uid) return res.status(403).json({ error: 'Not your review' });
+
+    const updates = {};
+    let newRating = null;
+    if (rating != null) {
+      const r = Number(rating);
+      if (!Number.isInteger(r) || r < 1 || r > 5) return res.status(400).json({ error: 'Rating must be 1-5' });
+      updates.rating = r;
+      newRating = r;
+    }
+    if (comment != null) {
+      const c = comment.trim();
+      if (c.length < 10 || c.length > 1000) return res.status(400).json({ error: 'Comment must be 10-1000 characters' });
+      updates.comment = c;
+    }
+    updates.edited = true;
+    updates.editedAt = new Date().toISOString();
+
+    const oldRating = doc.data().rating;
+    await Promise.all([
+      db.collection('reviews').doc(id).set(updates, { merge: true }),
+      newRating != null ? updateProductRating(doc.data().productId, oldRating, newRating) : Promise.resolve(),
+    ]);
+
+    console.log(`[REVIEW] ✏️  Review ${id} updated by ${uid}`);
+    res.json({ id, ...doc.data(), ...updates });
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to update review:', err.message);
+    res.status(500).json({ error: 'Failed to update review' });
+  }
+});
+
+app.delete('/api/reviews/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { uid } = req.user;
+
+  try {
+    const doc = await db.collection('reviews').doc(id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Review not found' });
+
+    const isAdmin = req.user.admin === true || req.user.email === process.env.FIREBASE_ADMIN_EMAIL;
+    if (doc.data().userId !== uid && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to delete this review' });
+    }
+
+    const productId = doc.data().productId;
+    await Promise.all([
+      db.collection('reviews').doc(id).delete(),
+      removeProductRating(productId, doc.data().rating),
+    ]);
+
+    console.log(`[REVIEW] 🗑️  Review ${id} deleted by ${uid}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to delete review:', err.message);
+    res.status(500).json({ error: 'Failed to delete review' });
+  }
+});
+
+app.post('/api/reviews/:id/helpful', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { uid } = req.user;
+
+  try {
+    const helpfulRef = db.collection('review_helpful').doc(`${id}_${uid}`);
+    const [reviewDoc, helpfulDoc] = await Promise.all([
+      db.collection('reviews').doc(id).get(),
+      helpfulRef.get(),
+    ]);
+    if (!reviewDoc.exists) return res.status(404).json({ error: 'Review not found' });
+
+    if (helpfulDoc.exists) {
+      const newCount = Math.max(0, (reviewDoc.data().helpfulCount || 0) - 1);
+      await Promise.all([
+        helpfulRef.delete(),
+        db.collection('reviews').doc(id).set({ helpfulCount: newCount }, { merge: true }),
+      ]);
+      return res.json({ helpful: false, helpfulCount: newCount });
+    }
+
+    const newCount = (reviewDoc.data().helpfulCount || 0) + 1;
+    await Promise.all([
+      helpfulRef.set({ reviewId: id, userId: uid, date: new Date().toISOString() }),
+      db.collection('reviews').doc(id).set({ helpfulCount: newCount }, { merge: true }),
+    ]);
+    res.json({ helpful: true, helpfulCount: newCount });
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to toggle helpful:', err.message);
+    res.status(500).json({ error: 'Failed to update helpful status' });
+  }
+});
+
+app.get('/api/reviews/:id/helpful/status', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { uid } = req.user;
+  try {
+    const [helpfulDoc, reviewDoc] = await Promise.all([
+      db.collection('review_helpful').doc(`${id}_${uid}`).get(),
+      db.collection('reviews').doc(id).get(),
+    ]);
+    res.json({
+      helpful: helpfulDoc.exists,
+      helpfulCount: reviewDoc.exists ? (reviewDoc.data().helpfulCount || 0) : 0,
+    });
+  } catch {
+    res.json({ helpful: false, helpfulCount: 0 });
+  }
+});
+
+app.post('/api/reviews/:id/report', verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  const { uid } = req.user;
+
+  if (!reason?.trim()) return res.status(400).json({ error: 'Reason is required' });
+
+  try {
+    const doc = await db.collection('reviews').doc(id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Review not found' });
+
+    const existing = await db.collection('review_reports')
+      .where('reviewId', '==', id)
+      .where('reporterId', '==', uid)
+      .limit(1)
+      .get();
+    if (!existing.empty) {
+      return res.status(409).json({ error: 'You have already reported this review' });
+    }
+
+    await db.collection('review_reports').add({
+      reviewId: id,
+      reporterId: uid,
+      reason: reason.trim(),
+      date: new Date().toISOString(),
+    });
+    console.log(`[REVIEW] 🚩 Review ${id} reported by ${uid}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[REVIEW] 🔴 Failed to report review:', err.message);
+    res.status(500).json({ error: 'Failed to report review' });
   }
 });
 
@@ -240,6 +549,25 @@ app.delete('/api/products/remove/:id', async (req, res) => {
   } catch (err) {
     console.error('[ADMIN ACTION] 🔴 DELETE error:', err.message);
     res.status(500).json({ error: 'Failed to remove product' });
+  }
+});
+
+app.post('/api/auth/sync-user', async (req, res) => {
+  const { uid, name, email } = req.body;
+  if (!uid || !email) {
+    return res.status(400).json({ error: 'uid and email are required' });
+  }
+  try {
+    const ref = db.collection('users').doc(uid);
+    const existing = await ref.get();
+    if (!existing.exists) {
+      await ref.set({ uid, name: name || email.split('@')[0], email, role: 'customer', createdAt: new Date().toISOString() });
+      console.log(`[AUTH] 👤 New user saved: ${email}`);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[AUTH] 🔴 sync-user error:', err.message);
+    res.status(500).json({ error: 'Failed to sync user' });
   }
 });
 
@@ -321,7 +649,7 @@ app.post('/api/auth/send-feedback-email', async (req, res) => {
 
 const PORT = 3001;
 seedIfEmpty().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n╔══════════════════════════════════════════╗`);
     console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
     console.log(`║   http://localhost:${PORT}/api/products  ║`);

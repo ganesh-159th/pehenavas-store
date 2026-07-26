@@ -4,15 +4,22 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
-function tryFirebaseSignup(name, email, password) {
-  import('../firebase').then(({ auth }) => {
-    if (!auth) return;
-    import('firebase/auth').then(({ createUserWithEmailAndPassword, updateProfile }) => {
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(result => updateProfile(result.user, { displayName: name }))
-        .catch(() => {});
-    }).catch(() => {});
-  }).catch(() => {});
+import { getApiBase } from '../config';
+async function tryFirebaseSignup(name, email, password) {
+  const { auth, db } = await import('../firebase');
+  if (!auth) throw new Error('Firebase not configured');
+  const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+  const { doc, setDoc } = await import('firebase/firestore');
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  await updateProfile(cred.user, { displayName: name });
+  await setDoc(doc(db, 'users', cred.user.uid), {
+    uid: cred.user.uid,
+    name,
+    email,
+    role: 'customer',
+    createdAt: new Date().toISOString(),
+  });
+  return cred.user;
 }
 
 const RoyalLotus = ({ className }) => (
@@ -80,22 +87,33 @@ const SignUp = () => {
       return;
     }
 
-    tryFirebaseSignup(name, email, password);
-
     try {
-      await fetch('http://localhost:3001/api/auth/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name }),
-      });
-    } catch {
-      // Silently fail — welcome email is non-critical
-    }
+      const fbUser = await tryFirebaseSignup(name, email, password);
 
-    login({ name: name.charAt(0).toUpperCase() + name.slice(1) });
-    showAlert('Account created successfully! Welcome aboard.', 'success');
-    const from = location.state?.from || '/';
-    navigate(from, { replace: true });
+      try {
+        await fetch(`${getApiBase()}/auth/send-welcome-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name }),
+        });
+      } catch {
+        // Silently fail — welcome email is non-critical
+      }
+
+      login({
+        uid: fbUser.uid,
+        email: fbUser.email,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+      });
+      showAlert('Account created successfully! Welcome aboard.', 'success');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      const msg = err.code === 'auth/email-already-in-use'
+        ? 'An account with this email already exists.'
+        : 'Failed to create account. Please try again.';
+      showAlert(msg, 'danger');
+    }
   };
 
   return (
