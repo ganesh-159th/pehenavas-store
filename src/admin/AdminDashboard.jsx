@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Plus, Search, X, Star, TrendingUp, Edit2, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { showAlert } from '../utils/alert';
 import { adminApi } from '../services/api';
@@ -37,6 +37,10 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
   const [syncing, setSyncing] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [pendingAddData, setPendingAddData] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const syncWithServer = useCallback(async () => {
     const serverProducts = await adminApi.getProducts();
@@ -112,7 +116,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const productData = {
+    setPendingAddData({
       name: data.name.trim(),
       price,
       description: data.description || '',
@@ -120,21 +124,41 @@ export default function AdminDashboard() {
       stock,
       image: imagePreview || '',
       colors: [],
-    };
+    });
+  };
 
+  const confirmAddProduct = async () => {
+    if (!pendingAddData || publishing) return;
+    setPublishing(true);
     try {
-      const saved = await adminApi.addProduct(productData);
+      const saved = await adminApi.addProduct(pendingAddData);
       addProduct(saved);
     } catch {
       showAlert('Failed to save product to server. Check server connection.', 'danger');
+      setPublishing(false);
       return;
     }
-
+    setPublishing(false);
+    setPendingAddData(null);
     reset();
     setImagePreview('');
     setShowAddModal(false);
 
     showAlert('Product added successfully!', 'success');
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete || deleting) return;
+    setDeleting(true);
+    try {
+      await adminApi.removeProduct(productToDelete.id);
+      removeProduct(productToDelete.id);
+      setProductToDelete(null);
+    } catch {
+      showAlert(`Could not delete "${productToDelete.name}". Check server connection.`, 'danger');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const filteredProducts = products.filter(product =>
@@ -199,6 +223,96 @@ export default function AdminDashboard() {
             </div>
               <button type="submit" className="w-full bg-amber-500 text-rose-950 font-bold py-3 mt-2 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md">Save Product</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Publish Confirmation Modal */}
+      {pendingAddData && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-amber-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold text-rose-950 font-serif">Publish Product</h3>
+              <button type="button" onClick={() => setPendingAddData(null)} className="text-gray-400 hover:text-rose-950 bg-rose-50 hover:bg-amber-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-gray-700">
+                Are you sure you want to publish <span className="font-bold text-rose-950">"{pendingAddData.name}"</span>?
+              </p>
+              <div className="bg-amber-50 border-2 border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
+                <p className="font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> Sandbox Environment
+                </p>
+                <p className="mt-1 text-amber-800/90">
+                  This product will be published to the live storefront and customers will be able to see and order it.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingAddData(null)}
+                  disabled={publishing}
+                  className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-wider disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmAddProduct}
+                  disabled={publishing}
+                  className="flex-1 bg-amber-500 text-rose-950 font-bold py-3 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md disabled:opacity-50"
+                >
+                  {publishing ? 'Publishing...' : 'Yes, Publish'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-red-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold text-red-700 font-serif">Delete Product</h3>
+              <button type="button" onClick={() => setProductToDelete(null)} className="text-gray-400 hover:text-red-600 bg-red-50 hover:bg-red-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-gray-700">
+                Are you sure you want to delete <span className="font-bold text-rose-950">"{productToDelete.name}"</span>?
+              </p>
+              <div className="bg-red-50 border-2 border-red-200 text-red-800 rounded-xl p-4 text-sm">
+                <p className="font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> Permanent Action
+                </p>
+                <p className="mt-1 text-red-700/90">
+                  This product will be permanently removed from the database. This cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setProductToDelete(null)}
+                  disabled={deleting}
+                  className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-wider disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteProduct}
+                  disabled={deleting}
+                  className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 transition-colors uppercase tracking-wider shadow-md disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -485,12 +599,7 @@ export default function AdminDashboard() {
                        <span className="text-xl font-bold text-rose-950 font-serif">{formatINR(product.price)}</span>
                        <div className="flex space-x-1">
                           <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
-                          <button onClick={async () => {
-                            removeProduct(product.id);
-                            try {
-                              await adminApi.removeProduct(product.id);
-                            } catch { /* ignore */ }
-                          }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                          <button onClick={() => setProductToDelete(product)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>
                     <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">
@@ -586,12 +695,7 @@ export default function AdminDashboard() {
                        <span className="text-xl font-bold text-rose-950 font-serif">{formatINR(product.price)}</span>
                        <div className="flex space-x-1">
                           <button className="p-2 text-rose-400 hover:bg-amber-100 hover:text-amber-600 rounded-lg transition-colors"><Edit2 className="w-4 h-4"/></button>
-                          <button onClick={async () => {
-                            removeProduct(product.id);
-                            try {
-                              await adminApi.removeProduct(product.id);
-                            } catch { /* ignore */ }
-                          }} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                          <button onClick={() => setProductToDelete(product)} className="p-2 text-rose-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
                        </div>
                     </div>
                     <div className="flex items-center space-x-1.5 mt-4 pt-4 border-t border-rose-50">

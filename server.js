@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'node:crypto';
 import 'dotenv/config';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
@@ -74,9 +75,59 @@ async function sendEmail(to, template, type = 'general') {
   }
 }
 
+const RETRYABLE_FIRESTORE_CODES = new Set([4, 8, 10, 13, 14, 'deadline-exceeded', 'resource-exhausted', 'aborted', 'internal', 'unavailable']);
+
+function isRetryableWriteError(err) {
+  if (RETRYABLE_FIRESTORE_CODES.has(err?.code)) return true;
+  if (typeof err?.code === 'string' && RETRYABLE_FIRESTORE_CODES.has(err.code.toLowerCase())) return true;
+  return /DEADLINE_EXCEEDED|RESOURCE_EXHAUSTED|UNAVAILABLE|ABORTED|INTERNAL/i.test(String(err?.message || ''));
+}
+
+async function withRetry(fn, { retries = 3, baseDelay = 120, maxDelay = 1500 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableWriteError(err) || attempt === retries) throw err;
+      const delay = Math.min(maxDelay, baseDelay * 2 ** attempt + Math.random() * baseDelay);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastErr;
+}
+
+function reviewDocId(productId, userId, comment) {
+  return crypto
+    .createHash('sha256')
+    .update(`${String(productId)}|${String(userId)}|${String(comment)}`)
+    .digest('hex')
+    .slice(0, 32);
+}
+
+const reviewRate = new Map();
+
+function checkReviewRate(userId, productId, limit = 5, windowMs = 60_000) {
+  const now = Date.now();
+  const key = `${userId}:${productId}`;
+  const entry = reviewRate.get(key);
+  if (!entry || entry.resetAt <= now) {
+    reviewRate.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  return true;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
 
 const SEED_PRODUCTS = [
   { id: 1, name: 'Royal Silk Sherwani', price: 12499, description: 'Luxurious silk sherwani for weddings.', category: 'Men', image: '', stock: 50, colors: ['Ivory', 'Gold'] },
@@ -337,7 +388,8 @@ app.post('/api/reviews', verifyToken, async (req, res) => {
     res.status(201).json({ id: docRef.id, ...review });
   } catch (err) {
     console.error('[REVIEW] 🔴 Failed to save review:', err.message);
-    res.status(500).json({ error: 'Failed to save review' });
+    const status = isRetryableWriteError(err) ? 503 : 500;
+    res.status(status).json({ error: 'Failed to save review. Please try again.' });
   }
 });
 
@@ -647,7 +699,7 @@ app.post('/api/auth/send-feedback-email', async (req, res) => {
   res.json({ success: true, emailSent: sent });
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 seedIfEmpty().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n╔══════════════════════════════════════════╗`);

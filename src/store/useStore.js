@@ -51,16 +51,9 @@ export const useStore = create(
         });
       },
 
-      syncProducts: (serverProducts) => set((state) => {
-        const serverMap = new Map(serverProducts.map(p => [String(p.id), p]));
-        const merged = state.products.map(p => serverMap.get(String(p.id)) || p);
-        serverProducts.forEach(sp => {
-          if (!merged.find(m => String(m.id) === String(sp.id))) {
-            merged.push(sp);
-          }
-        });
-        return { products: merged };
-      }),
+      syncProducts: (serverProducts) => set(() => ({
+        products: Array.isArray(serverProducts) ? serverProducts : [],
+      })),
 
       // Drawer State
       openCart: () => set({ isCartOpen: true }),
