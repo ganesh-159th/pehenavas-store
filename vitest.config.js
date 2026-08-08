@@ -12,10 +12,10 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'clover'],
       include: ['src/**/*.{js,jsx}'],
       thresholds: {
-        statements: 50,
-        branches: 75,
-        functions: 40,
-        lines: 50,
+        statements: 60,
+        branches: 60,
+        functions: 60,
+        lines: 60,
       }
     }
   },

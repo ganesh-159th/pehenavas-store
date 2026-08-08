@@ -4,13 +4,13 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
-function tryFirebaseSignIn(email, password) {
-  import('../firebase').then(({ auth }) => {
-    if (!auth) return;
-    import('firebase/auth').then(({ signInWithEmailAndPassword }) => {
-      signInWithEmailAndPassword(auth, email, password).catch(() => {});
-    }).catch(() => {});
-  }).catch(() => {});
+import { getApiBase } from '../config';
+async function tryFirebaseSignIn(email, password) {
+  const { auth } = await import('../firebase');
+  if (!auth) throw new Error('Firebase not configured');
+  const { signInWithEmailAndPassword } = await import('firebase/auth');
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  return cred.user;
 }
 
 const RoyalLotus = ({ className }) => (
@@ -67,20 +67,35 @@ const SignIn = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignIn = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
     if (!validate()) {
       showAlert('Please fix the form errors before signing in.', 'warning');
       return;
     }
 
-    tryFirebaseSignIn(email, password);
-
-    const userName = email.split('@')[0];
-    login({ name: userName.charAt(0).toUpperCase() + userName.slice(1) });
-    showAlert('Signed in successfully! Welcome back.', 'success');
-    const from = location.state?.from || '/';
-    navigate(from, { replace: true });
+    try {
+      const fbUser = await tryFirebaseSignIn(email, password);
+      const name = fbUser.displayName || email.split('@')[0];
+      const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+      login({
+        uid: fbUser.uid,
+        email: fbUser.email,
+        name: displayName,
+      });
+      try {
+        await fetch(`${getApiBase()}/auth/sync-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: fbUser.uid, name: displayName, email: fbUser.email }),
+        });
+      } catch { /* non-critical */ }
+      showAlert('Signed in successfully! Welcome back.', 'success');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });
+    } catch {
+      showAlert('Invalid email or password.', 'danger');
+    }
   };
 
   const handleForgotPassword = async (e) => {
@@ -98,7 +113,7 @@ const SignIn = () => {
 
     setResetLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/send-reset-email', {
+      const res = await fetch(`${getApiBase()}/auth/send-reset-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resetEmail }),
@@ -110,6 +125,10 @@ const SignIn = () => {
         } else {
           setResetError(data.error || 'Failed to send reset email. Please try again.');
         }
+        return;
+      }
+      if (data.emailSent === false) {
+        setResetError('Email service is not configured. Please contact support.');
         return;
       }
       setResetSent(true);

@@ -19,6 +19,7 @@ import NotFound from './components/NotFound';
 import { useUser } from './hooks/useUser';
 import { useCart } from './hooks/useCart';
 import { useStore } from './store/useStore';
+import { useRealtimeProducts } from './hooks/useRealtimeProducts';
 
 
 const RoyalLotus = ({ className }) => (
@@ -44,7 +45,8 @@ export default function App() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const { products, wishlist, serverConnected, setServerConnected } = useStore();
+    const { products, wishlist, serverConnected } = useStore();
+    useRealtimeProducts();
 
     useEffect(() => {
       const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -59,16 +61,6 @@ export default function App() {
             setTimeout(() => loader?.remove(), 400);
         }
     }, []);
-
-    useEffect(() => {
-      fetch('http://localhost:3001/api/products')
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => {
-          useStore.getState().syncProducts(data);
-          setServerConnected(true);
-        })
-        .catch(() => { /* server not available */ });
-    }, [setServerConnected]);
 
     const searchResults = useMemo(() => {
         if (debouncedSearch.trim() === "") {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "npm run dev",
-    "dev": "vite --open --port 3000",
+    "dev": "vite --open --host --port 3000",
     "server": "node server.js",
     "dev:full": "node server.js & vite --open --port 3000",
     "build": "vite build",
