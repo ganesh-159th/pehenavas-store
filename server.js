@@ -197,7 +197,7 @@ app.post('/api/products/add', async (req, res) => {
   };
 
   try {
-    await db.collection('products').doc(String(id)).set(product);
+    await withRetry(() => db.collection('products').doc(String(id)).set(product));
     console.log(`[ADMIN ACTION] 🟢 SUCCESS: Product "${product.name}" added (₹${product.price})`);
     res.status(201).json(product);
   } catch (err) {
@@ -367,8 +367,18 @@ app.post('/api/reviews', verifyToken, async (req, res) => {
     return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
   }
   const trimmed = comment.trim();
+  if (!checkReviewRate(uid, String(productId))) {
+    return res.status(429).json({ error: 'Too many reviews submitted. Please try again later.' });
+  }
+
+  const reviewId = reviewDocId(String(productId), uid, trimmed);
 
   try {
+    const existing = await db.collection('reviews').doc(reviewId).get();
+    if (existing.exists) {
+      return res.status(409).json({ error: 'You have already submitted this exact review.' });
+    }
+
     const userName = req.user.name || req.user.email?.split('@')[0] || 'Anonymous';
     const review = {
       productId: String(productId),
@@ -379,13 +389,15 @@ app.post('/api/reviews', verifyToken, async (req, res) => {
       date: new Date().toISOString(),
       helpfulCount: 0,
     };
-    const [docRef] = await Promise.all([
-      db.collection('reviews').add(review),
-      updateProductRating(productId, null, ratingNum),
-    ]);
+    await withRetry(async () => {
+      await Promise.all([
+        db.collection('reviews').doc(reviewId).set(review),
+        updateProductRating(productId, null, ratingNum),
+      ]);
+    });
 
     console.log(`[REVIEW] ⭐ Review added for product #${productId} (${ratingNum}/5) by ${userName}`);
-    res.status(201).json({ id: docRef.id, ...review });
+    res.status(201).json({ id: reviewId, ...review });
   } catch (err) {
     console.error('[REVIEW] 🔴 Failed to save review:', err.message);
     const status = isRetryableWriteError(err) ? 503 : 500;
@@ -576,7 +588,7 @@ app.put('/api/products/:id', async (req, res) => {
       stock: stock != null ? Number(stock) : doc.data().stock,
       colors: colors || doc.data().colors,
     };
-    await db.collection('products').doc(String(id)).set(updated);
+    await withRetry(() => db.collection('products').doc(String(id)).set(updated));
     console.log(`[ADMIN ACTION] 🟢 UPDATED: Product #${id} "${updated.name}"`);
     res.json(updated);
   } catch (err) {
@@ -595,7 +607,7 @@ app.delete('/api/products/remove/:id', async (req, res) => {
     }
 
     const removed = doc.data();
-    await db.collection('products').doc(String(id)).delete();
+    await withRetry(() => db.collection('products').doc(String(id)).delete());
     console.log(`[ADMIN ACTION] 🔴 ALERT: Product "${removed.name}" removed (ID: ${removed.id})`);
     res.json({ success: true, removed });
   } catch (err) {
@@ -637,7 +649,7 @@ app.post('/api/auth/send-reset-email', async (req, res) => {
     const sent = await sendEmail(email, passwordReset(email, link), 'reset');
     res.json({ success: true, emailSent: sent });
   } catch (err) {
-    if (err.code === 'auth/user-not-found') {
+    if (err.code === 'auth/user-not-found' || String(err.message).startsWith('INTERNAL ASSERT')) {
       return res.status(404).json({ error: 'No account found with this email' });
     }
     console.error('[AUTH] 🔴 Reset email error:', err.message);

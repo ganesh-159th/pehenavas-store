@@ -19,12 +19,20 @@ describe('UserContext', () => {
   });
 
   it('initializes with user data when localStorage has saved data', () => {
-    // Pre-populate localStorage
+    // Pre-populate localStorage (must include uid — restored users without one are treated as logged out)
+    localStorage.setItem('pehenavas_user', JSON.stringify({ uid: 'user-123', name: 'Admin User' }));
+    
+    const { result } = renderHook(() => useUserContext(), { wrapper: UserProvider });
+    
+    expect(result.current.user).toEqual({ uid: 'user-123', name: 'Admin User' });
+  });
+
+  it('ignores saved data without a uid (treats as logged out)', () => {
     localStorage.setItem('pehenavas_user', JSON.stringify({ name: 'Admin User' }));
     
     const { result } = renderHook(() => useUserContext(), { wrapper: UserProvider });
     
-    expect(result.current.user).toEqual({ name: 'Admin User' });
+    expect(result.current.user).toBeNull();
   });
 
   it('login() sets the user and successfully saves to localStorage', () => {
