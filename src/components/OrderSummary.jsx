@@ -3,8 +3,15 @@ import { CheckCircle2, Sparkles, Package, Truck } from 'lucide-react';
 import { formatINR } from '../utils';
 import { useFadeIn } from '../hooks/useFadeIn';
 
-const OrderSummary = ({ cart, cartTotal, orderDetails, address, onBackToShopping }) => {
+const PAYMENT_LABELS = {
+  upi: 'UPI',
+  card: 'Credit / Debit Card',
+  cod: 'Cash on Delivery',
+};
+
+const OrderSummary = ({ cart, cartTotal, orderDetails, address, paymentMethod, onBackToShopping }) => {
     const isVisible = useFadeIn();
+    const paymentLabel = PAYMENT_LABELS[paymentMethod] || 'Prepaid';
 
     return (
     <div className={`bg-white rounded-2xl shadow-2xl border border-rose-200 p-6 md:p-12 text-center max-w-3xl mx-auto my-8 transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
@@ -33,7 +40,7 @@ const OrderSummary = ({ cart, cartTotal, orderDetails, address, onBackToShopping
             </div>
             <div>
                 <p className="text-xs text-rose-500 uppercase tracking-wider font-bold mb-1">Payment Method</p>
-                <p className="font-bold text-rose-950">Prepaid</p>
+                <p className="font-bold text-rose-950">{paymentLabel}</p>
             </div>
         </div>
 

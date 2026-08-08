@@ -6,7 +6,10 @@ export const UserContext = createContext();
 export const UserProvider = ({ children }) => {
     const [user, setUser] = useState(() => {
         const savedUser = localStorage.getItem('pehenavas_user');
-        return savedUser ? JSON.parse(savedUser) : null;
+        if (!savedUser) return null;
+        const parsed = JSON.parse(savedUser);
+        if (!parsed?.uid) return null;
+        return parsed;
     });
 
     useEffect(() => {
@@ -31,6 +34,8 @@ export const UserProvider = ({ children }) => {
                             email: fbUser.email,
                             name: name.charAt(0).toUpperCase() + name.slice(1),
                         });
+                    } else {
+                        setUser(null);
                     }
                 });
             });

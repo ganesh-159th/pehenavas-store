@@ -8,6 +8,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { showAlert } from '../utils/alert';
 import { useStore } from '../store/useStore';
+import { createPaymentOrder, verifyPayment, saveOrder, openRazorpayCheckout } from '../services/payments';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
@@ -65,6 +66,93 @@ const Checkout = () => {
         if (errors.cardCvv) setErrors({ ...errors, cardCvv: null });
     };
 
+    const buildOrderData = (overrideId) => {
+        const orderId = overrideId || `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
+        const today = new Date();
+        const deliveryDate = new Date(today);
+        deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
+        return {
+            id: orderId,
+            date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
+            delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }),
+            items: [...cart],
+            total: cartTotal,
+            status: 'Confirmed',
+            paymentMethod,
+            address: { ...address }
+        };
+    };
+
+    const finalizeOrder = (order) => {
+        addOrder(order);
+        setFinalOrder({
+            cart: [...cart],
+            cartTotal,
+            details: {
+                id: order.id,
+                date: order.date,
+                delivery: order.delivery
+            },
+            address: { ...address },
+            paymentMethod: order.paymentMethod,
+            status: order.status,
+        });
+        setShowOrderSummary(true);
+        clearCart();
+        showAlert('Order placed successfully! 🎉', 'success');
+    };
+
+    const placeCodOrder = () => {
+        setOrderPlaced(true);
+        setTimeout(() => {
+            const order = buildOrderData();
+            saveOrder({ orderId: order.id, amount: cartTotal, items: order.items, address: order.address, method: 'cod' })
+                .catch(() => showAlert('Order placed locally. Could not sync to server.', 'warning'));
+            finalizeOrder(order);
+        }, 1000);
+    };
+
+    const startOnlinePayment = async () => {
+        setOrderPlaced(true);
+        try {
+            const payment = await createPaymentOrder({
+                amount: cartTotal,
+                method: paymentMethod,
+                items: [...cart],
+                address,
+            });
+            await openRazorpayCheckout({
+                razorpayOrderId: payment.razorpayOrderId,
+                amount: payment.amount,
+                description: `Pehenavas order ${payment.id}`,
+                onSuccess: async (response) => {
+                    try {
+                        await verifyPayment({
+                            orderId: payment.id,
+                            razorpayOrderId: response.razorpay_order_id,
+                            paymentId: response.razorpay_payment_id,
+                            signature: response.razorpay_signature,
+                        });
+                        const order = buildOrderData(payment.id);
+                        order.status = 'Paid';
+                        order.paymentId = response.razorpay_payment_id;
+                        finalizeOrder(order);
+                    } catch (err) {
+                        setOrderPlaced(false);
+                        showAlert(err.message || 'Payment verification failed. Please contact support.', 'danger');
+                    }
+                },
+                onFailure: (err) => {
+                    setOrderPlaced(false);
+                    showAlert(err.message || 'Payment was not completed.', 'danger');
+                },
+            });
+        } catch (err) {
+            setOrderPlaced(false);
+            showAlert(err.message || 'Could not initiate payment. Please try again.', 'danger');
+        }
+    };
+
     const handlePlaceOrder = () => {
         if (cart.length === 0) return;
 
@@ -96,36 +184,11 @@ const Checkout = () => {
             return;
         }
 
-        setOrderPlaced(true);
-        setTimeout(() => {
-            const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
-            const today = new Date();
-            const deliveryDate = new Date(today);
-            deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
-            const order = { 
-                id: orderId,
-                date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
-                delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }),
-                items: [...cart],
-                total: cartTotal,
-                status: 'Confirmed',
-                address: { ...address }
-            };
-            addOrder(order);
-            setFinalOrder({ 
-                cart: [...cart], 
-                cartTotal,
-                details: {
-                    id: orderId,
-                    date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
-                    delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })
-                },
-                address: { ...address }
-            });
-            setShowOrderSummary(true);
-            clearCart();
-            showAlert('Order placed successfully! 🎉', 'success');
-        }, 1000);
+        if (paymentMethod === 'cod') {
+            placeCodOrder();
+        } else {
+            startOnlinePayment();
+        }
     };
 
     const handleBackToShopping = () => {
@@ -152,7 +215,7 @@ const Checkout = () => {
     }
 
     if (showOrderSummary && finalOrder) {
-        return <OrderSummary cart={finalOrder.cart} cartTotal={finalOrder.cartTotal} orderDetails={finalOrder.details} address={finalOrder.address} onBackToShopping={handleBackToShopping} />;
+        return <OrderSummary cart={finalOrder.cart} cartTotal={finalOrder.cartTotal} orderDetails={finalOrder.details} address={finalOrder.address} paymentMethod={finalOrder.paymentMethod} onBackToShopping={handleBackToShopping} />;
     }
 
     return (

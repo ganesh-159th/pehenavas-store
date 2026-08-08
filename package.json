@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "npm run dev",
-    "dev": "vite --open --port 3000",
+    "dev": "vite --open --host --port 3000",
     "server": "node server.js",
     "dev:full": "node server.js & vite --open --port 3000",
     "build": "vite build",
@@ -20,10 +20,13 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.21.0",
     "firebase": "^12.14.0",
     "firebase-admin": "^13.10.0",
     "lucide-react": "^0.575.0",
+    "nodemailer": "^9.0.3",
+    "razorpay": "^2.9.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.76.1",

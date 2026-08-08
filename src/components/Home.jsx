@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { useStore } from '../store/useStore';
 
+const FALLBACK_BANNER = 'https://picsum.photos/seed/pehenavas-fallback/1600/600';
+
 const initialState = {
     activeCategory: "All",
     quickViewProduct: null,
@@ -107,7 +109,7 @@ const Home = ({ searchResults, searchQuery }) => {
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-rose-900/20 mb-12 h-96">
                         {BANNERS.map((banner, index) => (
                             <div key={banner.id} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentBanner ? 'opacity-100' : 'opacity-0'}`}>
-                                <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
+                                <img src={banner.image} alt={banner.title} onError={(e) => { e.currentTarget.src = FALLBACK_BANNER; }} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-rose-950/80 to-transparent"></div>
                                 <div className="absolute bottom-0 left-0 p-8 md:p-12 text-white">
                                     <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold drop-shadow-lg">{banner.title}</h2>

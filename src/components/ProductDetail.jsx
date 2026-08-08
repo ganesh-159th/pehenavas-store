@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Star, ArrowLeft, MessageSquare } from 'lucide-react';
+import { ShoppingCart, Star, ArrowLeft, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatINR } from '../utils.js';
 import { useCart } from '../hooks/useCart';
 import { useFadeIn } from '../hooks/useFadeIn';
 import { useStore } from '../store/useStore';
 import { useUser } from '../hooks/useUser';
-import { addReview, getProductReviews } from '../services/reviews';
+import { useRealtimeReviews } from '../hooks/useRealtimeReviews';
+import { addReview, updateReview, batchHelpfulStatus } from '../services/reviews';
+import RatingBreakdown from './RatingBreakdown';
+import ReviewCard from './ReviewCard';
+import ReviewForm from './ReviewForm';
+import ReviewSortBar from './ReviewSortBar';
+
+const REVIEWS_PER_PAGE = 5;
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -17,50 +24,67 @@ const ProductDetail = () => {
     const storeProducts = useStore((state) => state.products);
     const [selectedSize, setSelectedSize] = useState('M');
     const [selectedColor, setSelectedColor] = useState(null);
-    const [reviews, setReviews] = useState([]);
-    const [rating, setRating] = useState(5);
-    const [comment, setComment] = useState('');
+    const [helpfulMap, setHelpfulMap] = useState({});
+    const [sort, setSort] = useState('recent');
     const [submitting, setSubmitting] = useState(false);
-    const [loadingReviews, setLoadingReviews] = useState(true);
+    const [editingReview, setEditingReview] = useState(null);
+    const [visibleCount, setVisibleCount] = useState(REVIEWS_PER_PAGE);
+    const [error, setError] = useState('');
+    const [formKey, setFormKey] = useState(0);
 
     const product = storeProducts.find(p => String(p.id) === String(id));
+    const { reviews, loading: loadingReviews } = useRealtimeReviews(product?.id, sort);
 
     useEffect(() => {
-      if (!product) return;
-      getProductReviews(product.id)
-        .then(setReviews)
-        .catch(() => {})
-        .finally(() => setLoadingReviews(false));
-    }, [product]);
+        if (!user || reviews.length === 0) return;
+        let cancelled = false;
+        batchHelpfulStatus(reviews.map(r => r.id))
+            .then(m => { if (!cancelled) setHelpfulMap(m); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [reviews, user]);
 
-    const avgRating = reviews.length
-      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-      : product?.rating ?? 0;
+    const stats = product ? {
+        averageRating: product.rating || 0,
+        totalReviews: product.reviews || 0,
+        distribution: product.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    } : null;
 
-    const handleSubmitReview = async (e) => {
-      e.preventDefault();
-      if (!user || !comment.trim()) return;
-      setSubmitting(true);
-      try {
-        await addReview({
-          productId: product.id,
-          userId: user.uid,
-          userName: user.name,
-          rating,
-          comment: comment.trim(),
-        });
-        setComment('');
-        setRating(5);
-        const updated = await getProductReviews(product.id);
-        setReviews(updated);
-      } catch {
-        // review submission failed silently
-      } finally {
-        setSubmitting(false);
-      }
+    const avgRating = stats?.averageRating ?? product?.rating ?? 0;
+
+    const handleSubmitReview = async ({ rating, comment }) => {
+        if (!user) return;
+        setSubmitting(true);
+        setError('');
+        try {
+            await addReview({ productId: product.id, rating, comment });
+            setFormKey(k => k + 1);
+            setVisibleCount(REVIEWS_PER_PAGE);
+        } catch (err) {
+            setError(err.message || 'Failed to submit review');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    // Dynamically update the document title for SEO and UX
+    const handleUpdateReview = async ({ rating, comment }) => {
+        if (!user || !editingReview) return;
+        setSubmitting(true);
+        setError('');
+        try {
+            await updateReview(editingReview.id, { rating, comment });
+            setEditingReview(null);
+        } catch (err) {
+            setError(err.message || 'Failed to update review');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeletedReview = () => {
+        setVisibleCount(REVIEWS_PER_PAGE);
+    };
+
     useEffect(() => {
         if (product) {
             document.title = `${product.name} | Pehenavas`;
@@ -84,6 +108,9 @@ const ProductDetail = () => {
     const handleAddToCart = () => {
         addToCart(product, selectedSize);
     };
+
+    const visibleReviews = reviews.slice(0, visibleCount);
+    const hasMore = visibleCount < reviews.length;
 
     return (
         <div className={`bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-rose-100/80 overflow-hidden transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
@@ -166,39 +193,49 @@ const ProductDetail = () => {
                     <h2 className="text-2xl font-serif font-bold text-rose-950">Customer Reviews</h2>
                 </div>
 
+                {/* Rating Breakdown */}
+                <div className="mb-8">
+                    <RatingBreakdown stats={stats} />
+                </div>
+
                 {/* Review Form */}
                 {user ? (
-                    <form onSubmit={handleSubmitReview} className="bg-rose-50/50 rounded-xl p-6 border border-rose-100 mb-8">
-                        <h3 className="font-bold text-rose-950 mb-3">Write a Review</h3>
-                        <div className="flex items-center gap-1 mb-4">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <button key={star} type="button" onClick={() => setRating(star)} className="text-amber-500 hover:scale-110 transition-transform">
-                                    <Star className={`w-8 h-8 ${star <= rating ? 'fill-current' : 'stroke-current'}`} />
-                                </button>
-                            ))}
-                            <span className="ml-2 text-sm text-rose-900/60 font-medium">{rating}/5</span>
+                    editingReview ? (
+                        <div className="mb-8">
+                            <ReviewForm
+                                initialRating={editingReview.rating}
+                                initialComment={editingReview.comment}
+                                onSubmit={handleUpdateReview}
+                                onCancel={() => setEditingReview(null)}
+                                isEditing
+                                submitting={submitting}
+                            />
                         </div>
-                        <textarea
-                            rows="3"
-                            placeholder="Share your experience with this product..."
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            className="w-full border-2 border-rose-200 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white resize-none"
-                            required
-                        />
-                        <button
-                            type="submit"
-                            disabled={submitting || !comment.trim()}
-                            className="mt-4 bg-amber-500 text-rose-950 font-bold py-3 px-8 rounded-xl hover:bg-amber-400 transition-colors uppercase tracking-wider shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? 'Submitting...' : 'Submit Review'}
-                        </button>
-                    </form>
+                    ) : (
+                        <div className="mb-8">
+                            <ReviewForm
+                                key={`new-${formKey}`}
+                                onSubmit={handleSubmitReview}
+                                submitting={submitting}
+                            />
+                        </div>
+                    )
                 ) : (
                     <div className="bg-rose-50/50 rounded-xl p-6 border border-rose-100 mb-8 text-center">
                         <p className="text-rose-900/60">
                             <Link to="/signin" className="text-amber-600 font-bold hover:underline">Sign in</Link> to leave a review.
                         </p>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 mb-6">{error}</div>
+                )}
+
+                {/* Sort Bar */}
+                {reviews.length > 0 && (
+                    <div className="mb-4">
+                        <ReviewSortBar sort={sort} onSortChange={setSort} reviewCount={reviews.length} />
                     </div>
                 )}
 
@@ -208,31 +245,35 @@ const ProductDetail = () => {
                 ) : reviews.length === 0 ? (
                     <div className="text-center py-8 text-rose-900/60">No reviews yet. Be the first to review!</div>
                 ) : (
-                    <div className="space-y-4">
-                        {reviews.map((review) => (
-                            <div key={review.id} className="bg-white rounded-xl p-5 border border-rose-100 shadow-sm">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-rose-950 text-amber-400 flex items-center justify-center font-bold text-sm">
-                                            {review.userName?.charAt(0)?.toUpperCase()}
-                                        </div>
-                                        <span className="font-bold text-rose-950 text-sm">{review.userName}</span>
-                                    </div>
-                                    <div className="flex items-center gap-0.5 text-amber-500">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-current' : 'stroke-current text-gray-300'}`} />
-                                        ))}
-                                    </div>
-                                </div>
-                                <p className="text-rose-900/80 text-sm leading-relaxed">{review.comment}</p>
-                                {review.date && (
-                                    <p className="text-xs text-rose-900/40 mt-2">
-                                        {new Date(review.date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                    <>
+                        <div className="space-y-4">
+                            {visibleReviews.map((review) => (
+                                <ReviewCard
+                                    key={review.id}
+                                    review={review}
+                                    helpfulStatus={helpfulMap[review.id]}
+                                    onEdit={setEditingReview}
+                                    onDeleted={handleDeletedReview}
+                                />
+                            ))}
+                        </div>
+                        {hasMore && (
+                            <button
+                                onClick={() => setVisibleCount(v => v + REVIEWS_PER_PAGE)}
+                                className="mt-6 w-full py-3 text-sm font-medium text-rose-900/60 hover:text-rose-950 border border-rose-200 rounded-xl hover:bg-rose-50 transition-all flex items-center justify-center gap-1"
+                            >
+                                <ChevronDown className="w-4 h-4" /> Show More Reviews
+                            </button>
+                        )}
+                        {visibleCount > REVIEWS_PER_PAGE && (
+                            <button
+                                onClick={() => setVisibleCount(REVIEWS_PER_PAGE)}
+                                className="mt-2 w-full py-3 text-sm font-medium text-rose-900/40 hover:text-rose-900/70 transition-all flex items-center justify-center gap-1"
+                            >
+                                <ChevronUp className="w-4 h-4" /> Show Less
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
         </div>

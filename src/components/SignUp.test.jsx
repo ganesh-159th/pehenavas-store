@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SignUp from './SignUp';
 import { useUser } from '../hooks/useUser';
@@ -12,6 +12,22 @@ vi.mock('../hooks/useUser', () => ({
 
 vi.mock('../hooks/useFadeIn', () => ({
   useFadeIn: () => true // Always return true so it renders synchronously in tests
+}));
+
+// 1b. Mock Firebase so tryFirebaseSignup resolves without a real backend
+vi.mock('../firebase', () => ({
+  auth: {},
+  db: {},
+}));
+
+vi.mock('firebase/auth', () => ({
+  createUserWithEmailAndPassword: vi.fn(),
+  updateProfile: vi.fn(),
+}));
+
+vi.mock('firebase/firestore', () => ({
+  doc: vi.fn(),
+  setDoc: vi.fn(),
 }));
 
 // 2. Mock useNavigate from react-router-dom
@@ -131,7 +147,18 @@ describe('SignUp Component', () => {
   });
 
   describe('Successful Registration', () => {
-    it('calls login and navigates to home when registration is fully valid', () => {
+    it('calls login and navigates to home when registration is fully valid', async () => {
+      global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      const { doc, setDoc } = await import('firebase/firestore');
+
+      createUserWithEmailAndPassword.mockResolvedValue({
+        user: { uid: 'test-uid', email: 'ganesh@example.com', displayName: 'ganesh kumar' },
+      });
+      updateProfile.mockResolvedValue();
+      doc.mockReturnValue({});
+      setDoc.mockResolvedValue();
+
       renderComponent();
       
       // Fill out valid data
@@ -144,15 +171,23 @@ describe('SignUp Component', () => {
       // Submit
       fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
       
+      await waitFor(() => {
+        expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(
+          {}, 'ganesh@example.com', 'StrongPass@123'
+        );
+        expect(updateProfile).toHaveBeenCalled();
+        expect(setDoc).toHaveBeenCalled();
+        expect(mockLogin).toHaveBeenCalledWith({
+          uid: 'test-uid',
+          email: 'ganesh@example.com',
+          name: 'Ganesh kumar',
+        });
+        expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+      });
+      
       // Should not show any errors
       expect(screen.queryByText('Full name is required.')).not.toBeInTheDocument();
       expect(screen.queryByText(/Password must be at least 8 characters/i)).not.toBeInTheDocument();
-      
-      // Should capitalize the first letter of the name!
-      expect(mockLogin).toHaveBeenCalledWith({ name: 'Ganesh kumar' });
-      
-      // Should navigate to Home
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 });
