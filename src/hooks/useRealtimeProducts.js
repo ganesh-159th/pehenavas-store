@@ -1,27 +1,44 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { adminApi } from '../services/api';
+
+const POLL_INTERVAL_MS = 5000;
 
 export function useRealtimeProducts() {
   const setServerConnected = useStore((s) => s.setServerConnected);
-  const synced = useRef(false);
 
   useEffect(() => {
-    let unsub = null;
+    let cancelled = false;
+    let timerId = null;
 
-    import('../firebase').then(({ db }) => {
-      if (!db) return;
-      import('firebase/firestore').then(({ collection, onSnapshot }) => {
-        unsub = onSnapshot(collection(db, 'products'), (snap) => {
-          const products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          useStore.getState().syncProducts(products);
-          if (!synced.current) {
-            synced.current = true;
-            setServerConnected(true);
-          }
-        });
-      });
+    const normalize = (product) => ({
+      ...product,
+      rating: product.rating ?? 0,
+      reviews: product.reviews ?? 0,
+      originalPrice: product.originalPrice ?? product.price,
+      colors: product.colors ?? [],
+      description: product.description ?? '',
+      stock: product.stock ?? 0,
     });
 
-    return () => { if (unsub) unsub(); };
+    const sync = async () => {
+      try {
+        const products = await adminApi.getProducts();
+        if (cancelled) return;
+        useStore.getState().syncProducts(products.map(normalize));
+        setServerConnected(true);
+      } catch {
+        if (cancelled) return;
+        setServerConnected(false);
+      }
+    };
+
+    sync();
+    timerId = setInterval(sync, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearInterval(timerId);
+    };
   }, [setServerConnected]);
 }
