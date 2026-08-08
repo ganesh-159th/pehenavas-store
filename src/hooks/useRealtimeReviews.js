@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
+import { getProductReviews } from '../services/reviews';
+
+const POLL_INTERVAL_MS = 10000;
 
 function sortReviews(list, sort) {
   const sorted = [...list];
@@ -18,22 +21,28 @@ export function useRealtimeReviews(productId, sort = 'recent') {
   useEffect(() => {
     if (!productId) return;
 
-    let unsub = null;
+    let cancelled = false;
+    let timerId = null;
 
-    import('../firebase').then(({ db }) => {
-      if (!db) return;
-      import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
-        const q = query(collection(db, 'reviews'), where('productId', '==', String(productId)));
-        unsub = onSnapshot(q, (snap) => {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setRawReviews(list);
-          setHasLoaded(true);
-        });
-      });
-    });
+    const sync = async () => {
+      try {
+        const list = await getProductReviews(productId, sort);
+        if (cancelled) return;
+        setRawReviews(list);
+        setHasLoaded(true);
+      } catch {
+        if (!cancelled) setHasLoaded(true);
+      }
+    };
 
-    return () => { if (unsub) unsub(); };
-  }, [productId]);
+    sync();
+    timerId = setInterval(sync, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearInterval(timerId);
+    };
+  }, [productId, sort]);
 
   const reviews = useMemo(() => sortReviews(rawReviews, sort), [rawReviews, sort]);
 

@@ -394,4 +394,115 @@ const feedbackReceived = (name, rating, category, message) => ({
   `),
 });
 
-export { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived };
+const PAYMENT_LABELS = {
+  upi: 'UPI',
+  card: 'Credit / Debit Card',
+  cod: 'Cash on Delivery',
+};
+
+const orderConfirmation = (email, order) => {
+  const paymentLabel = PAYMENT_LABELS[order.paymentMethod] || 'Prepaid';
+  const isPaid = String(order.status).toLowerCase() === 'paid';
+  const itemsHtml = (order.items || []).map((item) => `
+        <tr>
+          <td style="padding:12px;border-bottom:1px solid #f0e6d6;font-size:14px;color:#374151;">
+            <strong>${item.name}</strong>
+            ${item.size ? `<br><span style="font-size:12px;color:#888888;">Size: ${item.size}</span>` : ''}
+          </td>
+          <td style="padding:12px;border-bottom:1px solid #f0e6d6;font-size:14px;color:#374151;text-align:center;">${item.qty}</td>
+          <td style="padding:12px;border-bottom:1px solid #f0e6d6;font-size:14px;color:#374151;text-align:right;">₹${(item.price * item.qty).toLocaleString('en-IN')}</td>
+        </tr>
+  `).join('');
+
+  const address = order.address || {};
+  const addressLines = [
+    address.fullName,
+    [address.line1, address.line2].filter(Boolean).join(', '),
+    [address.city, address.state].filter(Boolean).join(', ') + (address.pincode ? ` - ${address.pincode}` : ''),
+    address.phone ? `Phone: ${address.phone}` : '',
+  ].filter(Boolean);
+
+  return {
+    subject: isPaid
+      ? `Payment Received for Order ${order.id} - Pehenavas`
+      : `Order ${order.id} Confirmed - Pehenavas`,
+    html: wrapper(isPaid ? 'Payment Received - Pehenavas' : 'Order Confirmed - Pehenavas', `
+    <div style="text-align:center;margin-bottom:32px;">
+      <table cellpadding="0" cellspacing="0" align="center" style="margin-bottom:20px;"><tr>
+        <td width="64" height="64" style="border-radius:50%;background-color:#d1fae5;text-align:center;vertical-align:middle;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="#065f46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="22,4 12,14.01 9,11.01" stroke="#065f46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </td>
+      </tr></table>
+      <h2 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#1c0a1e;font-family:Georgia,'Times New Roman',serif;">
+        ${isPaid ? 'Payment Received!' : 'Order Confirmed!'}
+      </h2>
+      <p style="margin:0;font-size:14px;color:#888888;">
+        ${isPaid ? 'Your payment has been successfully processed.' : 'Your order has been placed successfully.'}
+      </p>
+    </div>
+
+    <!-- Order Banner -->
+    <div style="background:linear-gradient(135deg,#1c0a1e,#4a1942);border-radius:12px;padding:24px;margin-bottom:24px;text-align:center;">
+      <p style="margin:0 0 6px;font-size:11px;color:#d4a843;text-transform:uppercase;letter-spacing:2px;">Order Number</p>
+      <p style="margin:0;font-size:24px;font-weight:700;color:#ffffff;font-family:Georgia,serif;letter-spacing:1px;">${order.id}</p>
+      <p style="margin:10px 0 0;font-size:13px;color:#e9d5ff;">${order.date}</p>
+    </div>
+
+    <!-- Status Cards -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td width="50%" style="padding:0 6px 0 0;">
+          <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
+            <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;">Payment Method</p>
+            <p style="margin:0;font-size:15px;font-weight:700;color:#1f2937;">${paymentLabel}</p>
+          </div>
+        </td>
+        <td width="50%" style="padding:0 0 0 6px;">
+          <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
+            <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;">Status</p>
+            <p style="margin:0;font-size:15px;font-weight:700;color:${isPaid ? '#065f46' : '#92400e'};">${isPaid ? 'Paid' : 'Confirmed (Pay on Delivery)'}</p>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Items Table -->
+    <div style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:0;margin-bottom:24px;overflow:hidden;">
+      <div style="background-color:#faf6f0;padding:12px 24px;border-bottom:1px solid #f0e6d6;">
+        <p style="margin:0;font-size:12px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Items You Ordered</p>
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="padding:0 12px;">
+        <tr>
+          <td style="padding:12px;font-size:11px;color:#888888;text-transform:uppercase;letter-spacing:1px;">Item</td>
+          <td style="padding:12px;font-size:11px;color:#888888;text-transform:uppercase;letter-spacing:1px;text-align:center;">Qty</td>
+          <td style="padding:12px;font-size:11px;color:#888888;text-transform:uppercase;letter-spacing:1px;text-align:right;">Amount</td>
+        </tr>
+        ${itemsHtml}
+        <tr>
+          <td style="padding:16px 12px;font-size:15px;font-weight:700;color:#1c0a1e;">Total</td>
+          <td style="padding:16px 12px;"></td>
+          <td style="padding:16px 12px;font-size:16px;font-weight:700;color:#b45309;text-align:right;">₹${Number(order.total || 0).toLocaleString('en-IN')}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Delivery -->
+    <div style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0;font-size:14px;color:#92400e;line-height:1.6;">
+        <strong>Estimated Delivery:</strong> ${order.delivery || '3-5 business days'}
+      </p>
+    </div>
+
+    <!-- Address -->
+    <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin-bottom:8px;">
+      <p style="margin:0 0 10px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Shipping Address</p>
+      ${addressLines.map((line) => `<p style="margin:0 0 4px;font-size:14px;color:#374151;line-height:1.5;">${line}</p>`).join('')}
+    </div>
+  `),
+  };
+};
+
+export { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived, orderConfirmation };
