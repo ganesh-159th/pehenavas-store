@@ -4,7 +4,8 @@ import crypto from 'node:crypto';
 import 'dotenv/config';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
-import { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived } from './server/emailTemplates.js';
+import Razorpay from 'razorpay';
+import { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived, orderConfirmation } from './server/emailTemplates.js';
 
 const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
 if (!b64) {
@@ -15,6 +16,16 @@ const serviceAccount = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
+
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+let razorpay = null;
+if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+  razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
+  console.log('[PAYMENTS] 💳 Razorpay configured (test mode)');
+} else {
+  console.log('[PAYMENTS] ⚠️  Razorpay NOT configured — set RAZORPAY_KEY_SECRET (and VITE_RAZORPAY_KEY_ID) in .env');
+}
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const EMAIL_USER = process.env.EMAIL_USER;
@@ -46,6 +57,7 @@ function getRecipient(to, type) {
     verify: process.env.EMAIL_OVERRIDE_VERIFY,
     support: process.env.EMAIL_OVERRIDE_SUPPORT,
     feedback: process.env.EMAIL_OVERRIDE_FEEDBACK,
+    order: process.env.EMAIL_OVERRIDE_ORDER,
   };
   return overrides[type] || process.env.EMAIL_OVERRIDE || to;
 }
@@ -553,6 +565,162 @@ app.post('/api/reviews/:id/report', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('[REVIEW] 🔴 Failed to report review:', err.message);
     res.status(500).json({ error: 'Failed to report review' });
+  }
+});
+
+// ── Orders & Payments API (Razorpay) ────────────────────────────────────────
+
+function buildOrderEmailData(doc) {
+  const today = new Date();
+  const deliveryDate = new Date(today);
+  deliveryDate.setDate(today.getDate() + Math.floor(Math.random() * 3) + 3);
+  return {
+    id: doc.orderId,
+    date: today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
+    delivery: deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' }),
+    items: doc.items || [],
+    total: doc.amount || 0,
+    address: doc.address || {},
+    paymentMethod: doc.paymentMethod || 'cod',
+    status: doc.status,
+  };
+}
+
+app.get('/api/payments/razorpay-key', (_req, res) => {
+  res.json({ keyId: RAZORPAY_KEY_ID || '' });
+});
+
+function buildOrderDoc({ uid, email, orderId, amount, items, address, method }) {
+  return {
+    orderId,
+    userId: uid,
+    userEmail: email,
+    amount: Number(amount),
+    amountPaise: Math.round(Number(amount) * 100),
+    currency: 'INR',
+    items: Array.isArray(items) ? items : [],
+    address: address || {},
+    paymentMethod: method,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+app.post('/api/orders', verifyToken, async (req, res) => {
+  const { orderId, amount, items, address, method } = req.body;
+  if (!orderId || amount == null || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'orderId, amount, and items are required' });
+  }
+  const doc = {
+    ...buildOrderDoc({
+      uid: req.user.uid,
+      email: req.user.email,
+      orderId,
+      amount,
+      items,
+      address,
+      method: method || 'cod',
+    }),
+    status: 'confirmed',
+    confirmedAt: new Date().toISOString(),
+  };
+  try {
+    await withRetry(() => db.collection('orders').add(doc));
+    console.log(`[ORDER] 🟢 ORDER PLACED (${doc.paymentMethod}): ${orderId} — ₹${doc.amount}`);
+    sendEmail(req.user.email, orderConfirmation(req.user.email, buildOrderEmailData(doc)), 'order');
+    res.status(201).json({ success: true, order: doc });
+  } catch (err) {
+    console.error('[ORDER] 🔴 Failed to save order:', err.message);
+    res.status(503).json({ error: 'Failed to save order. Please try again.' });
+  }
+});
+
+app.post('/api/payments/create-order', verifyToken, async (req, res) => {
+  const { amount, items, address, method } = req.body;
+  if (amount == null || amount <= 0 || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'amount and items are required' });
+  }
+  if (!razorpay) {
+    return res.status(503).json({ error: 'Payment gateway is not configured. Set Razorpay keys in .env on the server.' });
+  }
+  const orderId = `PHN-${Math.floor(100000 + Math.random() * 900000)}`;
+  const amountPaise = Math.round(Number(amount) * 100);
+  try {
+    const rzpOrder = await razorpay.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: orderId,
+      notes: { userId: req.user.uid },
+    });
+    const doc = buildOrderDoc({
+      uid: req.user.uid,
+      email: req.user.email,
+      orderId,
+      amount,
+      items,
+      address,
+      method: method || 'upi',
+    });
+    await withRetry(() => db.collection('orders').add({ ...doc, razorpayOrderId: rzpOrder.id }));
+    console.log(`[PAYMENTS] 🧾 Razorpay order created: ${rzpOrder.id} (receipt ${orderId}) — ₹${amount}`);
+    res.status(201).json({ id: orderId, razorpayOrderId: rzpOrder.id, amount: amountPaise, currency: 'INR' });
+  } catch (err) {
+    console.error('[PAYMENTS] 🔴 Failed to create Razorpay order:', err.message);
+    res.status(502).json({ error: 'Could not initiate payment. Please try again.' });
+  }
+});
+
+app.post('/api/payments/verify', verifyToken, async (req, res) => {
+  const { orderId, razorpayOrderId, paymentId, signature } = req.body;
+  if (!orderId || !razorpayOrderId || !paymentId || !signature) {
+    return res.status(400).json({ error: 'Missing payment verification data' });
+  }
+  if (!RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({ error: 'Payment gateway is not configured.' });
+  }
+  const expected = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET)
+    .update(`${razorpayOrderId}|${paymentId}`)
+    .digest('hex');
+  const received = Buffer.from(String(signature));
+  const ok = received.length === Buffer.from(expected).length
+    && crypto.timingSafeEqual(received, Buffer.from(expected));
+  if (!ok) {
+    return res.status(400).json({ error: 'Payment signature verification failed.' });
+  }
+  try {
+    const snapshot = await db.collection('orders')
+      .where('orderId', '==', orderId)
+      .where('userId', '==', req.user.uid)
+      .limit(1)
+      .get();
+    if (snapshot.empty) return res.status(404).json({ error: 'Order not found' });
+    const ref = snapshot.docs[0].ref;
+    await ref.set({
+      status: 'paid',
+      paymentId,
+      razorpayOrderId,
+      paymentStatus: 'captured',
+      paidAt: new Date().toISOString(),
+    }, { merge: true });
+    const order = (await ref.get()).data();
+    console.log(`[PAYMENTS] ✅ Payment verified for order ${orderId} (${paymentId})`);
+    sendEmail(req.user.email, orderConfirmation(req.user.email, buildOrderEmailData(order)), 'order');
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('[PAYMENTS] 🔴 Payment verification error:', err.message);
+    res.status(500).json({ error: 'Failed to verify payment.' });
+  }
+});
+
+app.get('/api/orders', verifyToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('orders')
+      .where('userId', '==', req.user.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+    res.json(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  } catch (err) {
+    console.error('[ORDER] 🔴 Failed to fetch orders:', err.message);
+    res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 

@@ -16,6 +16,16 @@ vi.mock('../hooks/useUser', () => ({
   useUser: vi.fn()
 }));
 
+// Mock the payments service (Razorpay flows)
+vi.mock('../services/payments', () => ({
+  createPaymentOrder: vi.fn(),
+  verifyPayment: vi.fn(),
+  saveOrder: vi.fn(),
+  openRazorpayCheckout: vi.fn(),
+}));
+
+import { createPaymentOrder, verifyPayment, saveOrder, openRazorpayCheckout } from '../services/payments';
+
 // 2. Mock utils for predictable formatting
 vi.mock('../utils.js', () => ({
   formatINR: (amount) => `₹${amount}`
@@ -38,6 +48,7 @@ describe('Checkout Component', () => {
     vi.clearAllMocks();
     vi.useFakeTimers(); // Control time for the setTimeout in handlePlaceOrder
     useUser.mockReturnValue({ user: { name: 'Test User' } });
+    saveOrder.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -117,6 +128,8 @@ describe('Checkout Component', () => {
 
     // 4. Verify the checkout screen is replaced by the Order Summary
     expect(screen.getByTestId('mock-order-summary')).toBeInTheDocument();
+    // 5. Verify the COD order was persisted to the server
+    expect(saveOrder).toHaveBeenCalledWith(expect.objectContaining({ method: 'cod' }));
   });
 
   describe('Card Payment Validation Flow', () => {
@@ -186,19 +199,58 @@ describe('Checkout Component', () => {
       expect(screen.queryByText(/Please enter a valid 16-digit card number/i)).not.toBeInTheDocument();
     });
 
-    it('processes valid card order successfully and shows Order Summary', () => {
+    it('processes valid card order successfully and shows Order Summary', async () => {
+      createPaymentOrder.mockResolvedValue({ id: 'PHN-654321', razorpayOrderId: 'order_rzptest', amount: 100000, currency: 'INR' });
+      openRazorpayCheckout.mockImplementation(({ onSuccess }) => onSuccess({
+        razorpay_order_id: 'order_rzptest',
+        razorpay_payment_id: 'pay_rzptest',
+        razorpay_signature: 'sig_rzptest',
+      }));
+      verifyPayment.mockResolvedValue({ success: true, order: { status: 'paid', paymentId: 'pay_rzptest' } });
+
       render(<Checkout />, { wrapper: BrowserRouter });
       fillAddress();
       fireEvent.click(screen.getByText(/Credit \/ Debit Card/i));
       fireEvent.change(screen.getByPlaceholderText('0000 0000 0000 0000'), { target: { value: '1234567812345678' } });
       fireEvent.change(screen.getByPlaceholderText('MM/YY'), { target: { value: '12/25' } });
       fireEvent.change(screen.getByPlaceholderText('123'), { target: { value: '123' } });
-      
-      fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
-      expect(screen.getByText(/Placing Order\.\.\./i)).toBeInTheDocument();
-      
-      act(() => { vi.runAllTimers(); });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(createPaymentOrder).toHaveBeenCalled();
+      expect(openRazorpayCheckout).toHaveBeenCalled();
+      expect(verifyPayment).toHaveBeenCalled();
       expect(screen.getByTestId('mock-order-summary')).toBeInTheDocument();
+    });
+
+    it('shows an error and stays on checkout when payment checkout fails', async () => {
+      createPaymentOrder.mockResolvedValue({ id: 'PHN-654321', razorpayOrderId: 'order_rzptest', amount: 100000, currency: 'INR' });
+      openRazorpayCheckout.mockRejectedValue(new Error('Payment was cancelled.'));
+
+      render(<Checkout />, { wrapper: BrowserRouter });
+      fillAddress();
+      fireEvent.click(screen.getByText(/Credit \/ Debit Card/i));
+      fireEvent.change(screen.getByPlaceholderText('0000 0000 0000 0000'), { target: { value: '1234567812345678' } });
+      fireEvent.change(screen.getByPlaceholderText('MM/YY'), { target: { value: '12/25' } });
+      fireEvent.change(screen.getByPlaceholderText('123'), { target: { value: '123' } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Place Order/i }));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(createPaymentOrder).toHaveBeenCalled();
+      expect(openRazorpayCheckout).toHaveBeenCalled();
+      expect(verifyPayment).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('mock-order-summary')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Place Order/i })).toBeInTheDocument();
     });
   });
 

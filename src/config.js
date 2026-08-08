@@ -8,3 +8,7 @@ export function getApiBase() {
   }
   return `http://${window.location.hostname}:${API_PORT}/api`;
 }
+
+export function getRazorpayKeyId() {
+  return import.meta.env.VITE_RAZORPAY_KEY_ID || '';
+}
