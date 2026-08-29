@@ -6,6 +6,7 @@ import { formatINR } from '../utils.js';
 import { useCart } from '../hooks/useCart';
 import { Link } from 'react-router-dom';
 import { useFadeIn } from '../hooks/useFadeIn';
+import { useSEO } from '../hooks/useSEO';
 import { useStore } from '../store/useStore';
 
 const FALLBACK_BANNER = 'https://picsum.photos/seed/pehenavas-fallback/1600/600';
@@ -58,6 +59,13 @@ const Home = ({ searchResults, searchQuery }) => {
         sortBy,
     } = state;
     const isVisible = useFadeIn();
+
+    useSEO({
+        title: 'Pehenavas - The Royal Heritage | Ethnic Wear & Traditional Indian Clothing',
+        description: 'Shop handcrafted royal heritage ethnic wear: bridal lehengas, sherwanis, bandhani sarees, mojaris and kundan jewellery from Rajasthan.',
+        image: BANNERS[0]?.image,
+        url: window.location.origin,
+    });
 
     // Auto-slide effect for banner
     useEffect(() => {
