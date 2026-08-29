@@ -121,23 +121,6 @@ Keep the subject line under 50 characters, use the imperative mood ("add",
    coverage threshold, and E2E tests.
 5. Keep PRs small and focused. One logical change per PR makes review faster.
 
-## Running Tests & Lint
-
-Run these locally before opening a PR:
-
-```bash
-npm run lint          # ESLint
-npm run build         # Production build (catches build errors)
-npm run test          # Unit tests (Vitest)
-npm run coverage      # Unit tests with coverage report + threshold gate
-npm run cypress:open  # Open Cypress for interactive E2E testing
-```
-
-Run the full pipeline (lint + build + unit + E2E) in one go:
-
-```bash
-npm run test:all
-```
 
 ## Reporting Bugs & Feature Requests
 
