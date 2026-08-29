@@ -10,7 +10,6 @@ Thanks for taking the time to contribute! 🎉 This guide will help you get set 
 - [Branch Naming](#branch-naming)
 - [Commit Conventions](#commit-conventions)
 - [Pull Request Process](#pull-request-process)
-- [Running Tests & Lint](#running-tests--lint)
 - [Reporting Bugs & Feature Requests](#reporting-bugs--feature-requests)
 
 ## Code of Conduct
