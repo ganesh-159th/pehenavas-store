@@ -6,8 +6,8 @@
   "scripts": {
     "start": "npm run dev",
     "dev": "vite --open --host --port 3000",
-    "server": "node server.js",
-    "dev:full": "node server.js & vite --open --port 3000",
+    "server": "NODE_OPTIONS=--no-deprecation node server.js",
+    "dev:full": "node scripts/dev.js",
     "build": "vite build",
     "postinstall": "npm run build",
     "clean": "rm -rf node_modules package-lock.json dist && npm install",
