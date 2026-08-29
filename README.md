@@ -107,6 +107,42 @@ Open **http://localhost:3000/** in your browser.
 
 ---
 
+## ☁️ Production Deployment (Render / Railway)
+
+The app is a **single Node/Express server** that serves both the built React
+frontend (`dist/`) and the `/api` backend on one port — no separate hosting
+needed.
+
+```bash
+# Build the frontend (outputs dist/)
+npm run build
+
+# Start the production server (serves dist/ + API on PORT, default 3001)
+npm run server
+```
+
+**Required environment variables (set in the hosting provider):**
+
+| Variable | Purpose |
+|----------|---------|
+| `FIREBASE_SERVICE_ACCOUNT_B64` | Base64 of your Firebase Admin SDK service-account JSON (required) |
+| `VITE_FIREBASE_*` | Firebase web config (used at **build time**) |
+| `ADMIN_API_KEY` | Secret protecting admin write routes (set a long random value) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Payment gateway keys |
+| `EMAIL_USER` / `EMAIL_PASS` | Gmail App Password for SMTP |
+| `APP_URL` | The public origin (e.g. `https://yourapp.onrender.com`) |
+| `CORS_ORIGINS` | Comma-separated allowed origins (leave empty in same-origin prod) |
+
+> ⚠️ **`VITE_*` variables must be available at build time.** On Render/Railway
+> set them in the service settings so `npm run build` (postinstall) picks them up.
+> `FIREBASE_SERVICE_ACCOUNT_B64`, `ADMIN_API_KEY`, `RAZORPAY_KEY_SECRET`,
+> `EMAIL_*` and `APP_URL` are runtime-only and read by the server process.
+
+**Docker:** `Dockerfile` is multi-stage (build → runtime) and serves the app
+for one process. Set the env vars above when running the container.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology |

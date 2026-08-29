@@ -1,5 +1,14 @@
 import { getApiBase } from '../config';
 const API_BASE = getApiBase();
+const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY || '';
+
+function adminHeaders(extra = {}) {
+  return {
+    'Content-Type': 'application/json',
+    ...(ADMIN_KEY ? { 'x-admin-key': ADMIN_KEY } : {}),
+    ...extra,
+  };
+}
 
 export const adminApi = {
   async getProducts() {
@@ -11,7 +20,7 @@ export const adminApi = {
   async addProduct(product) {
     const res = await fetch(`${API_BASE}/products/add`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(product),
     });
     if (!res.ok) {
@@ -24,7 +33,7 @@ export const adminApi = {
   async updateProduct(id, product) {
     const res = await fetch(`${API_BASE}/products/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(product),
     });
     if (!res.ok) {
@@ -37,6 +46,7 @@ export const adminApi = {
   async removeProduct(id) {
     const res = await fetch(`${API_BASE}/products/remove/${id}`, {
       method: 'DELETE',
+      headers: adminHeaders(),
     });
     if (!res.ok) {
       const err = await res.json();

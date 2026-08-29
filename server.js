@@ -1,11 +1,18 @@
 import express from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
 import Razorpay from 'razorpay';
 import { passwordReset, emailVerification, welcomeEmail, supportRequest, feedbackReceived, orderConfirmation } from './server/emailTemplates.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST_DIR = path.join(__dirname, 'dist');
+const hasStaticBuild = fs.existsSync(path.join(DIST_DIR, 'index.html'));
 
 const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
 if (!b64) {
@@ -22,9 +29,14 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 let razorpay = null;
 if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
   razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
-  console.log('[PAYMENTS] 💳 Razorpay configured (test mode)');
+  console.log('[PAYMENTS] 💳 Razorpay configured');
 } else {
-  console.log('[PAYMENTS] ⚠️  Razorpay NOT configured — set RAZORPAY_KEY_SECRET (and VITE_RAZORPAY_KEY_ID) in .env');
+  const missing = [
+    !RAZORPAY_KEY_ID && 'RAZORPAY_KEY_ID',
+    !RAZORPAY_KEY_SECRET && 'RAZORPAY_KEY_SECRET',
+  ].filter(Boolean).join(', ');
+  console.log(`[PAYMENTS] ⚠️  Razorpay NOT configured — missing ${missing} in .env`);
+  console.log('[PAYMENTS]    Card/UPI online payments will be disabled. Add your Razorpay test keys from https://dashboard.razorpay.com to enable them.');
 }
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
@@ -47,7 +59,12 @@ if (EMAIL_USER && EMAIL_PASS) {
       mailer = null;
     });
 } else {
-  console.log('[EMAIL] ⚠️  Email not configured (set EMAIL_USER and EMAIL_PASS in .env)');
+  const missing = [
+    !EMAIL_USER && 'EMAIL_USER',
+    !EMAIL_PASS && 'EMAIL_PASS',
+  ].filter(Boolean).join(', ');
+  console.log(`[EMAIL] ⚠️  Email not configured — missing ${missing} in .env`);
+  console.log('[EMAIL]    Welcome/order/reset emails will be skipped. EMAIL_PASS must be a Gmail App Password (https://myaccount.google.com/apppasswords), not your normal password.');
 }
 
 function getRecipient(to, type) {
@@ -134,8 +151,24 @@ function checkReviewRate(userId, productId, limit = 5, windowMs = 60_000) {
 }
 
 const app = express();
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// CORS — restrict to configured origins for security. In production the
+// frontend is served by this same server (same origin), so no CORS is needed.
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin: allowedOrigins.includes('*') ? true : allowedOrigins,
+  }));
+} else {
+  // Development default: only local frontend origins.
+  app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:5174', 'http://127.0.0.1:3000', 'http://127.0.0.1:5174'],
+  }));
+}
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
@@ -184,7 +217,7 @@ app.get('/api/products', async (_req, res) => {
   }
 });
 
-app.post('/api/products/add', async (req, res) => {
+app.post('/api/products/add', adminAuth, async (req, res) => {
   const { name, price, description, category, image, stock, colors } = req.body;
 
   if (!name || !name.trim()) {
@@ -231,6 +264,26 @@ async function verifyToken(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+// Shared-secret admin auth for admin write routes (products add/update/delete).
+// The key must be set via ADMIN_API_KEY on the server. The frontend sends it in
+// the x-admin-key header (configured with VITE_ADMIN_API_KEY). This is a
+// lightweight guard; for stricter control use server-side role checks instead.
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+function adminAuth(req, res, next) {
+  if (!ADMIN_API_KEY) {
+    // Not configured — allow in dev, fail closed is only enforceable once set.
+    console.warn('[ADMIN] ⚠️  ADMIN_API_KEY not set — admin routes are NOT protected. Set it before deploying.');
+    return next();
+  }
+  const provided = req.headers['x-admin-key'];
+  const a = Buffer.from(String(provided || ''));
+  const b = Buffer.from(ADMIN_API_KEY);
+  if (provided && a.length === b.length && crypto.timingSafeEqual(a, b)) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Admin authentication required' });
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -738,7 +791,7 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', adminAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = await db.collection('products').doc(String(id)).get();
@@ -765,7 +818,7 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/products/remove/:id', async (req, res) => {
+app.delete('/api/products/remove/:id', adminAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = await db.collection('products').doc(String(id)).get();
@@ -879,12 +932,29 @@ app.post('/api/auth/send-feedback-email', async (req, res) => {
   res.json({ success: true, emailSent: sent });
 });
 
+// ── Static frontend (production) ────────────────────────────────────────────
+// When a production build exists (dist/), serve it and fall back to index.html
+// for client-side (React Router) routes. All /api routes take precedence.
+if (hasStaticBuild) {
+  app.use(express.static(DIST_DIR));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+  console.log(`[STATIC] 📦 Serving built frontend from ${DIST_DIR}`);
+} else {
+  app.get('/', (_req, res) => {
+    res.send('Pehenavas API is running. Run `npm run build` and restart to serve the web app. API docs: /api/health');
+  });
+  console.log('[STATIC] ⚠️  No dist/ build found — API only. Run `npm run build` to serve the frontend.');
+}
+
 const PORT = process.env.PORT || 3001;
 seedIfEmpty().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n╔══════════════════════════════════════════╗`);
-    console.log(`║   🏪 PEHENAVAS ADMIN API SERVER        ║`);
-    console.log(`║   http://localhost:${PORT}/api/products  ║`);
+    console.log(`║   🏪 PEHENAVAS STORE SERVER             ║`);
+    console.log(`║   ${hasStaticBuild ? '🌐 Web + API' : '🔌 API only'}  →  http://localhost:${PORT}${hasStaticBuild ? '' : '/api/products'}  ║`);
     console.log(`╚══════════════════════════════════════════╝\n`);
   });
 });

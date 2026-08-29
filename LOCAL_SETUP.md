@@ -156,7 +156,16 @@ npm run dev
 
 ## Environment Files Needed
 
-Currently, the project doesn't require any `.env` file. All config is in:
+Copy `.env.example` to `.env` and fill in your values for the backend and build:
+
+```bash
+cp .env.example .env
+```
+
+Required for the server: `FIREBASE_SERVICE_ACCOUNT_B64` (base64 of the Firebase
+Admin SDK JSON). Optional but recommended: `ADMIN_API_KEY`, `RAZORPAY_*`,
+`EMAIL_*`, `APP_URL`. `VITE_*` values are embedded at build time.
+
 - `vite.config.js` - Build config
 - `tailwind.config.js` - Styling config
 - `eslint.config.js` - Linting config
