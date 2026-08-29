@@ -1,0 +1,85 @@
+name: 🐛 Bug report
+description: Report a bug so we can fix it
+title: "[Bug]: "
+labels: [bug]
+assignees:
+  - ganesh-159th
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in as much detail as possible below.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: A short, one-line summary of the bug
+      placeholder: e.g. "Cart subtotal is wrong when quantity reaches zero"
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Affected module
+      description: Which part of the app is affected?
+      options:
+        - Storefront / Home
+        - Product details
+        - Reviews
+        - Cart
+        - Wishlist
+        - Checkout / Payments
+        - Accounts / Auth
+        - Admin portal
+        - Backend / API
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce the issue?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / recordings
+      description: If applicable, add screenshots or screen recordings to help explain the problem.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser and OS you used (and commit hash if known)
+      placeholder: e.g. "Chrome 132 on macOS 14.5, commit abc1234"
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true

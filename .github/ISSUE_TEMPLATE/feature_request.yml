@@ -1,0 +1,66 @@
+name: ✨ Feature request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: [enhancement]
+assignees:
+  - ganesh-159th
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Please describe the feature and why it matters.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: A short, one-line summary of the requested feature
+      placeholder: e.g. "Add order tracking status page"
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Affected module
+      description: Which part of the app is this for?
+      options:
+        - Storefront / Home
+        - Product details
+        - Reviews
+        - Cart
+        - Wishlist
+        - Checkout / Payments
+        - Accounts / Auth
+        - Admin portal
+        - Backend / API
+        - Docs / CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem it solves
+      description: What user problem or pain point does this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature and how you envision it working.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches or workarounds you've thought about?
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What should be true for this feature to be considered done?
+      placeholder: |
+        - [ ] Feature works end to end
+        - [ ] Covered by tests
+        - [ ] Documentation updated if needed
