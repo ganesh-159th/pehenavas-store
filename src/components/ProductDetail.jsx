@@ -7,6 +7,7 @@ import { useFadeIn } from '../hooks/useFadeIn';
 import { useStore } from '../store/useStore';
 import { useUser } from '../hooks/useUser';
 import { useRealtimeReviews } from '../hooks/useRealtimeReviews';
+import { useSEO } from '../hooks/useSEO';
 import { addReview, updateReview, batchHelpfulStatus } from '../services/reviews';
 import RatingBreakdown from './RatingBreakdown';
 import ReviewCard from './ReviewCard';
@@ -14,6 +15,16 @@ import ReviewForm from './ReviewForm';
 import ReviewSortBar from './ReviewSortBar';
 
 const REVIEWS_PER_PAGE = 5;
+const FALLBACK_PRODUCT_IMAGE = 'https://picsum.photos/seed/pehenavas-product/800/1000';
+
+function toAbsoluteUrl(url) {
+    if (!url) return '';
+    try {
+        return new URL(url, window.location.origin).href;
+    } catch {
+        return '';
+    }
+}
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -85,13 +96,52 @@ const ProductDetail = () => {
         setVisibleCount(REVIEWS_PER_PAGE);
     };
 
-    useEffect(() => {
-        if (product) {
-            document.title = `${product.name} | Pehenavas`;
-        } else {
-            document.title = 'Product Not Found | Pehenavas';
-        }
-    }, [product]);
+    const pageUrl = product ? `${window.location.origin}/product/${product.id}` : window.location.href;
+
+    const productImage = product ? toAbsoluteUrl(product.image) || FALLBACK_PRODUCT_IMAGE : undefined;
+
+    const productJsonLd = product && {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        image: productImage,
+        description: product.description,
+        category: product.category,
+        sku: `PHN-${product.id}`,
+        color: product.colors || [],
+        brand: { '@type': 'Brand', name: 'Pehenavas' },
+        url: pageUrl,
+        offers: {
+            '@type': 'Offer',
+            price: product.price,
+            priceCurrency: 'INR',
+            availability: product.stock == null || Number(product.stock) > 0
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
+            itemCondition: 'https://schema.org/NewCondition',
+            url: pageUrl,
+        },
+        ...(product.reviews > 0 && {
+            aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: Number(product.rating) || 0,
+                reviewCount: product.reviews,
+                bestRating: 5,
+                worstRating: 1,
+            },
+        }),
+    };
+
+    useSEO({
+        title: product ? `${product.name} | Pehenavas` : 'Product Not Found | Pehenavas',
+        description: product && product.description
+            ? `${product.description.slice(0, 160)}${product.description.length > 160 ? '…' : ''}`
+            : 'The item you are looking for does not exist or has been removed.',
+        image: productImage,
+        url: pageUrl,
+        type: 'product',
+        jsonLd: productJsonLd,
+    });
 
     if (!product) {
         return (
