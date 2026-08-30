@@ -154,9 +154,25 @@ npm run dev
 
 ---
 
-## Environment Files Needed
+## Environment Files & One-Time Setup
 
-Copy `.env.example` to `.env` and fill in your values for the backend and build:
+The public values (Firebase web config, etc.) are already pre-filled in
+`.env.example`. Run the setup script once to generate `.env` automatically —
+it copies the template, auto-encodes your Firebase admin key if present, and
+prompts only for optional secrets (Gmail app password, Razorpay keys).
+
+**macOS / Linux:**
+```bash
+./setup.sh
+```
+
+**Windows:**
+```bat
+setup.bat
+```
+
+The script performs the copy of `.env.example` to `.env` for you, so you don't
+normally need this manual step. Manually it is:
 
 ```bash
 cp .env.example .env
@@ -165,6 +181,10 @@ cp .env.example .env
 Required for the server: `FIREBASE_SERVICE_ACCOUNT_B64` (base64 of the Firebase
 Admin SDK JSON). Optional but recommended: `ADMIN_API_KEY`, `RAZORPAY_*`,
 `EMAIL_*`, `APP_URL`. `VITE_*` values are embedded at build time.
+
+> **Note:** `.env` is gitignored. The setup script creates it once per machine.
+> If you skip the secrets (Gmail/Razorpay), the website still works — it just
+> won't send automated emails or accept online card/UPI payments.
 
 - `vite.config.js` - Build config
 - `tailwind.config.js` - Styling config
