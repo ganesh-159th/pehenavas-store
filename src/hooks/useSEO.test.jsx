@@ -69,4 +69,16 @@ describe('useSEO', () => {
     expect(document.getElementById('seo-jsonld')).toBeNull();
     expect(document.querySelector('link[rel="canonical"]')).toBeNull();
   });
+
+  it('restores the previous title and only removes injected tags on unmount', () => {
+    document.title = 'Standalone Page | Pehenavas';
+
+    const { unmount } = renderHook(() => useSEO(BASE));
+    expect(document.title).toBe(BASE.title);
+
+    unmount();
+
+    expect(document.title).toBe('Standalone Page | Pehenavas');
+    expect(document.querySelector('link[rel="canonical"]')).toBeNull();
+  });
 });

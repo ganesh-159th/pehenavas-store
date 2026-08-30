@@ -15,6 +15,16 @@ import ReviewForm from './ReviewForm';
 import ReviewSortBar from './ReviewSortBar';
 
 const REVIEWS_PER_PAGE = 5;
+const FALLBACK_PRODUCT_IMAGE = 'https://picsum.photos/seed/pehenavas-product/800/1000';
+
+function toAbsoluteUrl(url) {
+    if (!url) return '';
+    try {
+        return new URL(url, window.location.origin).href;
+    } catch {
+        return '';
+    }
+}
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -88,11 +98,13 @@ const ProductDetail = () => {
 
     const pageUrl = product ? `${window.location.origin}/product/${product.id}` : window.location.href;
 
+    const productImage = product ? toAbsoluteUrl(product.image) || FALLBACK_PRODUCT_IMAGE : undefined;
+
     const productJsonLd = product && {
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: product.name,
-        image: product.image,
+        image: productImage,
         description: product.description,
         category: product.category,
         sku: `PHN-${product.id}`,
@@ -125,7 +137,7 @@ const ProductDetail = () => {
         description: product && product.description
             ? `${product.description.slice(0, 160)}${product.description.length > 160 ? '…' : ''}`
             : 'The item you are looking for does not exist or has been removed.',
-        image: product?.image,
+        image: productImage,
         url: pageUrl,
         type: 'product',
         jsonLd: productJsonLd,

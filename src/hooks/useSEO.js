@@ -50,7 +50,8 @@ function upsertJsonLd(jsonLd) {
  * script for the current page.
  *
  * All injected tags are cleaned up on unmount; tags already present in the
- * static index.html are updated in place instead of being removed.
+ * static index.html are updated in place instead of being removed. The
+ * document title is restored to its previous value when this hook changed it.
  */
 export function useSEO({ title, description, image, url, type = 'website', jsonLd } = {}) {
   const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
@@ -59,6 +60,7 @@ export function useSEO({ title, description, image, url, type = 'website', jsonL
     if (typeof document === 'undefined') return undefined;
 
     const created = [];
+    const prevTitle = document.title;
     const finalUrl = url || window.location.href;
     const finalTitle = title || document.title;
 
@@ -93,6 +95,7 @@ export function useSEO({ title, description, image, url, type = 'website', jsonL
 
     return () => {
       created.forEach((el) => el.remove());
+      if (finalTitle !== prevTitle) document.title = prevTitle;
     };
   }, [title, description, image, url, type, jsonLdString]);
 }
