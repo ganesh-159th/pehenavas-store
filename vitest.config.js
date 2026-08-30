@@ -12,10 +12,40 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'clover'],
       include: ['src/**/*.{js,jsx}'],
       thresholds: {
-        statements: 60,
-        branches: 60,
-        functions: 60,
-        lines: 60,
+        statements: 70,
+        branches: 75,
+        functions: 65,
+        lines: 70,
+        'src/store/**': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        'src/services/**': {
+          statements: 80,
+          branches: 70,
+          functions: 80,
+          lines: 80,
+        },
+        'src/components/Checkout.jsx': {
+          statements: 80,
+          branches: 80,
+          functions: 75,
+          lines: 80,
+        },
+        'src/components/ReviewCard.jsx': {
+          statements: 80,
+          branches: 75,
+          functions: 80,
+          lines: 80,
+        },
+        'src/components/ReviewForm.jsx': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
       }
     }
   },
